@@ -1,22 +1,10 @@
-cat > Dockerfile.dev << 'EOF'
-# frontend/Dockerfile.dev
-# ホットリロード対応の開発用 Dockerfile
-
 FROM node:20-alpine
 
 WORKDIR /app
 
-# package.json だけ先にコピーしてキャッシュを活用
-# （ソースコードより先にインストールすることで、
-#   コード変更のたびに npm install が走るのを防ぐ）
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# ソースは compose.yaml のボリュームマウントで渡すので COPY 不要
-
 EXPOSE 3000
 
-# Next.js 開発サーバー起動
-# --turbo で高速ホットリロード（Next.js 14）
 CMD ["npm", "run", "dev"]
-EOF
