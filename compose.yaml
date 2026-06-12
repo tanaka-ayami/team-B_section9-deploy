@@ -1,0 +1,166 @@
+# ============================================================
+# compose.yaml  - 書類・プリント管理アプリ チーム開発用
+# 使い方:
+#   docker compose up -d      → 起動
+#   docker compose down       → 停止
+#   docker compose logs -f    → ログ確認
+#   docker compose down -v    → 完全リセット（データ消えます！要チャット告知）
+#   docker compose build --no-cache → 再ビルド
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # フロントエンド  Next.js 14 + TypeScript
+  # ----------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app                         # ホットリロード用：ソースをマウント
+      - frontend_node_modules:/app/node_modules # node_modules はコンテナ側を優先
+    env_file:
+      - .env
+    environment:
+      - WATCHPACK_POLLING=true                  # Docker on Mac/Windows でのホットリロード安定化
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # バックエンド  FastAPI + Python
+  # ----------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app                          # ホットリロード用（uvicorn --reload）
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy              # DB が起動してから立ち上がる
+      redis:
+        condition: service_healthy              # Redis が起動してから立ち上がる
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # Celery Worker  リマインドメール・非同期タスク処理
+  # ----------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: celery -A app.worker worker --loglevel=info --autoscale=4,1
+    volumes:
+      - ./backend:/app                          # バックエンドと同じソースを共有
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # Celery Beat  定期実行スケジューラ（リマインド・月次リセット）
+  # ----------------------------------------------------------
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: celery -A app.worker beat --loglevel=info
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # PostgreSQL  メインDB
+  # ----------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"                             # TablePlus / DBeaver から直接接続可能
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql  # 初期スキーマ
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # Redis  キャッシュ + Celery ブローカー + APIリトライキュー
+  # ----------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes      # データ永続化
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # Adminer  ブラウザで DB を確認できる軽量ツール（開発用のみ）
+  #   アクセス: http://localhost:8080
+  #   System: PostgreSQL / Server: db / User: .envのPOSTGRES_USERの値
+  # ----------------------------------------------------------
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # Redis Commander  ブラウザで Redis を確認できるツール（開発用のみ）
+  #   アクセス: http://localhost:8081
+  # ----------------------------------------------------------
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+# ============================================================
+# Volumes  名前付きボリューム（コンテナ削除後もデータ保持）
+# ============================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  frontend_node_modules:
+    driver: local
