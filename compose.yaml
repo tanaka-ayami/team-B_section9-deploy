@@ -80,16 +80,12 @@ services:
   db:
     image: postgres:16-alpine
     ports:
-      - "5432:5432"                            # TablePlus / DBeaver から直接接続可能
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql  # 初期スキーマ
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     env_file:
-      - .env
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-appdb}
-      POSTGRES_USER: ${POSTGRES_USER:-appuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apppass}
+      - .env                        # .envだけで管理する
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-appuser}"]
       interval: 5s
