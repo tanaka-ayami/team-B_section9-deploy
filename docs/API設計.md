@@ -20,7 +20,8 @@
 | POST | `/v1/auth/signup` | 新規ユーザー登録＆初期化 | 必要 | Firebase認証後、DBにユーザー作成＆個人グループと初期カテゴリを自動生成。 |
 | GET | `/v1/users/me` | 自身のユーザー情報取得 | 必要 | 残りスキャン枚数やリマインド日数設定を含む。 |
 | PATCH | `/v1/users/me` | リマインド日数等の設定更新 | 必要 | リマインド設定日数（N日前）を変更。 |
-| POST | `/v1/documents/scan` | 書類画像のアップロード＆AI解析 | 必要 | 署名付きURL発行・OpenAI解析を実行（モック/失敗時は空を返す）。 |
+| POST | `/v1/documents/scan` | 書類画像のアップロード＆AI解析 | 必要 | 署名付きURL発行・OpenAI解析を実行（AI解析失敗時は OPENAI_API_FAILED（500）を返す。
+フロントは空欄の確認画面を表示して手入力に誘導する。）。 |
 | POST | `/v1/documents` | 書類データの最終登録 | 必要 | 解析確認画面からの登録。カレンダー即時反映＆リマインド生成。 |
 | GET | `/v1/documents` | 書類一覧取得（カレンダー/期限なし） | 必要 | 所属グループの書類一覧（FullCalendar同期用・カテゴリ絞り込み可）。 |
 | PATCH | `/v1/documents/{id}` | 書類編集 / 済スタンプON・OFF | 必要 | 済ONで `notification_schedules` を `cancelled` へ。 |
