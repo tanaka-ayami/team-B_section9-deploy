@@ -110,18 +110,25 @@ export function AuthForm() {
   return (
     <div className="bg-white rounded-t-3xl px-6 pt-8 pb-12">
       <div className="flex rounded-full p-1 mb-7" style={{ background: "#EEF1EC" }}>
-        {(["login", "register"] as AuthTab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => switchTab(t)}
-            className="flex-1 py-2 rounded-full text-xs font-medium transition-colors"
-            style={tab === t ? { background: "#4A7C59", color: "#fff" } : { color: "#6B7C6F" }}
-          >
-            {t === "login" ? "ログイン" : "新規登録"}
-          </button>
-        ))}
-      </div>
+        <div
+            role="button"
+            tabIndex={0}
+            onPointerDown={() => switchTab("login")}
+            className="flex-1 py-2 rounded-full text-xs font-medium text-center cursor-pointer select-none"
+            style={tab === "login" ? { background: "#4A7C59", color: "#fff" } : { color: "#6B7C6F" }}
+        >
+            ログイン
+        </div>
+        <div
+            role="button"
+            tabIndex={0}
+            onPointerDown={() => switchTab("register")}
+            className="flex-1 py-2 rounded-full text-xs font-medium text-center cursor-pointer select-none"
+            style={tab === "register" ? { background: "#4A7C59", color: "#fff" } : { color: "#6B7C6F" }}
+        >
+            新規登録
+        </div>
+    </div>
 
       {resetSent && (
         <div className="mb-4 p-3 rounded-xl text-xs" style={{ background: "#EAF3DE", border: "1px solid #86BFAD", color: "#3B6D11" }}>
