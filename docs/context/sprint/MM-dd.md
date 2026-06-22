@@ -37,6 +37,16 @@
 
 ## タスク設計
 
--
--
--
+- かぜっち
+* DBスキーマ設計・Alembic 初期マイグレーション（users / groups / group_members / documents / categories）
+- はゆっち
+* Cloudinary SDK セットアップ・署名付きURL発行確認
+* OpenAI Structured Outputs PoC（GPT-4o 画像解析テスト）
+- みかっち
+* UI-001 ログイン / サインアップ画面（Firebase Auth SDK組み込み）— Issue #14
+* 共通 API クライアント（Bearer トークン付与・リフレッシュ処理）
+* MSW セットアップ（typed mock）
+* UI-002 カレンダー画面骨格（FullCalendar月表示）— Issue #23
+- あやみ
+* それぞれの担当のヘルプにまわる
+* ログイン→JWT→カレンダー遷移の結合確認
