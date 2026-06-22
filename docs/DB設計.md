@@ -1,103 +1,183 @@
-# DB 設計
+# データベース設計書（v1.1）
 
-## 1. 設計方針
+## 変更履歴
 
-- **採用 DBMS**: PostgreSQL
-- **命名規則**: 
-  - テーブル名：複数形（例：`users`, `documents`）
-  - カラム名：`snake_case`（例：`firebase_uid`, `notification_schedules`）
-- **物理削除 / 論理削除の方針**: 
-  - 原則として**物理削除**とする。
-  - ただし、非同期通知管理である `notification_schedules` については、要件定義に基づき物理削除ではなく `status` を `'cancelled'`（キャンセル）に変更することで論理的な状態管理を行う。
-- **マイグレーション運用方針**: 
-  - **Alembic** を使用してバックエンド（FastAPI / SQLAlchemy）と同期的にスキーマ変更履歴をコード管理する。
+| バージョン | 変更内容 |
+|---|---|
+| v1.0 | 初版 |
+| v1.1 | レビュー指摘事項を反映。①`notification_schedules.user_id` の役割（送信先特定ロジック）を明記、②`users` テーブルの管理カラムを再確認・強調、③主キー方針が **UUID** であることを明記（`bigint` ではない） |
 
-## 2. ER 図
+---
 
-> ![ERD](drawSQL-image-export-2026-06-12.webp)
-> 
-> ※リレーションシップ概要：
-> - `users` と `groups` は `group_users` を介した多対多の関係（ただし、ユーザー登録時に個人グループが自動生成され1対1のような構造からスタートする仕様をサポート）。
-> - `groups` と `documents` は 1対多 の関係。
-> - `documents` と `notification_schedules` は 1対多 の関係。
+## 0. レビュー指摘事項への回答（補足）
 
-## 3. テーブル定義
+### ① notification_schedules の宛先（user_id）について
+`notification_schedules` には **`user_id`（`users.id` への外部キー）** を保持しており、これが「誰に送るか」を示すカラムである。メールアドレスそのものは持たせず、Celery Workerが処理時に `user_id` → `users.id` → `users.email` の経路でメールアドレスを取得し送信する。
 
-### users
-Firebase Auth連携に伴い、通常のパスワードカラムは廃止し、認証基盤が発行する一意の識別子（`firebase_uid`）を格納します。また、全員にメールアドレス登録を必須化する要件に対応します。
+これは、ユーザーが後からメールアドレスを変更した場合でも、過去に生成済みのリマインドタスクが常に最新の送信先を参照できるようにするための設計である（メールアドレスをスナップショットとしてコピーしない）。
 
-| カラム名 | 型 | NULL | デフォルト | 説明 |
-| :--- | :--- | :--- | :--- | :--- |
-| id | bigint | NO | (シリアル) | 主キー |
-| firebase_uid | varchar(128) | NO | | Firebase Authが発行する一意のUID（認証連携用） |
-| email | varchar(255) | NO | | ユーザーのメールアドレス（必須要件対応） |
-| created_at | timestamp | NO | now() | 作成日時 |
-| updated_at | timestamp | NO | now() | 更新日時 |
+### ② users テーブルの不足カラムについて
+`plan_status` / `monthly_scan_count` / `remind_days_before` の3カラムは `users` テーブルに含まれている（3.1節参照）。API設計書の `GET /v1/users/me`（取得）・`PATCH /v1/users/me`（更新）が対応するエンドポイントであり、別テーブルでの管理は行わない。
 
-### groups
-共有および個人用のワークスペースを定義します（登録時に個人グループが自動生成されるロジックに対応）。
+### ③ 主キーの型について
+全テーブルの主キーは **UUID（`gen_random_uuid()`）** で統一する。`bigint`（連番）は採用しない。
 
-| カラム名 | 型 | NULL | デフォルト | 説明 |
-| :--- | :--- | :--- | :--- | :--- |
-| id | bigint | NO | (シリアル) | 主キー |
-| name | varchar(100) | NO | | グループ名（個人用の場合はユーザー名等） |
-| created_at | timestamp | NO | now() | 作成日時 |
-| updated_at | timestamp | NO | now() | 更新日時 |
+理由：
+- 要件定義書およびER図との整合性を保つため。
+- 将来的な分散環境・複数インスタンスでのID生成競合を避けるため。
+- URLやAPIレスポンスにIDをそのまま含めても、連番のように全体件数や成長速度を推測されない（推測可能性の低減）。
 
-### group_users
-ユーザーとグループを紐付ける中間テーブルです（権限平等化に基づき、ロール属性はシンプル化、または将来の拡張要素とします）。
+---
 
-| カラム名 | 型 | NULL | デフォルト | 説明 |
-| :--- | :--- | :--- | :--- | :--- |
-| id | bigint | NO | (シリアル) | 主キー |
-| group_id | bigint | NO | | 外部キー（`groups.id` への参照） |
-| user_id | bigint | NO | | 外部キー（`users.id` への参照） |
-| created_at | timestamp | NO | now() | 参加日時 |
+## 1. データベース概要
 
-### documents
-OpenAIマルチモーダル解析によって抽出された書類（プリント）データとカレンダー同期用のメタデータを管理します。「済スタンプ」の状態もここで保持します。
+本システムは、ユーザー、グループ、書類、および通知・リマインドを管理するため、リレーショナルデータベースとして **PostgreSQL** を採用する。
 
-| カラム名 | 型 | NULL | デフォルト | 説明 |
-| :--- | :--- | :--- | :--- | :--- |
-| id | bigint | NO | (シリアル) | 主キー |
-| group_id | bigint | NO | | 外部キー（`groups.id` への参照、登録即時カレンダー反映用） |
-| title | varchar(255) | NO | | 書類タイトル |
-| deadline_date | date | YES | | 提出・イベント期限日（解析結果） |
-| image_url | text | NO | | Cloudinary等に保存された書類の安全な画像URL |
-| is_completed | boolean | NO | false | 「済スタンプ」フラグ（trueでリマインドキャンセル連動） |
-| category | varchar(50) | YES | | 書類カテゴリ（シードデータより割当） |
-| created_at | timestamp | NO | now() | 登録日時（アプリ内即時通知のトリガー用） |
-| updated_at | timestamp | NO | now() | 更新日時 |
+オブジェクトのID（主キー）には、分散環境での競合を避けるため、**全テーブル共通でUUID（v4）** を採用する（`bigint` 等の連番は使用しない）。
 
-### notification_schedules
-期限日の「3日前メール自動リマインド」の送信予定や、Celery Workerによる「指数バックオフ（最大3回リトライ）」、スタンプ連携によるステータス変更を追跡するトランザクションテーブルです。
+---
 
-| カラム名 | 型 | NULL | デフォルト | 説明 |
-| :--- | :--- | :--- | :--- | :--- |
-| id | bigint | NO | (シリアル) | 主キー |
-| document_id | bigint | NO | | 外部キー（`documents.id` への参照） |
-| scheduled_date| date | NO | | リマインドメール送信予定日（期限の3日前など） |
-| status | varchar(20) | NO | 'pending' | 状態（`pending`, `sent`, `failed`, `cancelled`） |
-| retry_count | integer | NO | 0 | 外部API失敗時の自動リトライカウンタ（最大3回） |
-| created_at | timestamp | NO | now() | スケジュールレコード作成日時（v7.1要件追記分） |
-| updated_at | timestamp | NO | now() | 更新日時 |
+## 2. テーブル一覧
 
-## 4. インデックス・制約
+| 物理テーブル名 | 論理テーブル名 | 概要 |
+|---|---|---|
+| `users` | ユーザー情報 | アプリ登録者のアカウント情報・プラン状態を管理。 |
+| `groups` | 共有グループ情報 | 書類を共有するグループ（家族や個人）を管理。 |
+| `group_members` | グループ所属情報 | ユーザーとグループの多対多の紐づけを管理（一律同等権限）。 |
+| `invitations` | グループ招待管理 | 他ユーザーをグループに招待するためのステータス管理。 |
+| `categories` | カテゴリマスタ | 書類の分類マスタ（初期シードあり、グループ固有の追加可）。 |
+| `documents` | 書類情報 | スキャンされた書類のメタデータ、AI解析結果、ステータスを管理。 |
+| `app_notifications` | アプリ内お知らせデータ | アプリ内ヘッダー（🔔）に表示する通知ログ。 |
+| `notification_schedules` | メールリマインド管理 | Celeryが参照する、期限前メールリマインドの送信キュー。 |
 
-- **`users` テーブル**:
-  - `UNIQUE (firebase_uid)` : Firebase認証トークンから高速かつ安全にユーザーを特定するための必須インデックス。
-  - `UNIQUE (email)` : 同一メールでの重複登録を防止。
-- **`group_users` テーブル**:
-  - `UNIQUE (group_id, user_id)` : 同一ユーザーが同じグループに二重登録されるのを防止（複合ユニーク制約）。
-- **`notification_schedules` テーブル**:
-  - `INDEX (status, scheduled_date)` : Celery Beatが「本日送信すべき未送信タスク（`pending`）」を毎日定時バッチで一括検索するための複合インデックス。
-  - `INDEX (document_id)` : 書類詳細画面で「済スタンプ」が押された際、該当するドキュメントの未送信リマインドを高速に特定して `status = 'cancelled'` へ一括アップデートするための外部キーインデックス。
+---
 
-## 5. データ保持・整合性ルール
+## 3. テーブル詳細定義
 
-- **「済スタンプ」とリマインドの整合性**:
-  - `documents.is_completed` が `true`（済スタンプON）に更新された場合、バックエンドのトリガーまたは非同期タスク（Celery）を介して、関連する `notification_schedules` のうち `status = 'pending'` であるレコードをすべて `status = 'cancelled'` に変更する。
-- **カレンダー・アプリ内お知らせのリアルタイム性**:
-  - グループ内の誰かが書類を登録（`documents`にインサート）した時点で、Next.js側およびカレンダーコンポーネント（FullCalendar）が参照するAPIが最新データを返すよう設計する。
-- **外部APIリトライ限界時のポリシー**:
-  - SendGrid等の外部通信失敗時、指数バックオフを伴うリトライが3回に達した（`retry_count = 3`）スケジュールは、システム側で自動的に `status = 'failed'` へ確定させ、エラーログ（ログレベルに応じた出力）を吐き出しタスクを終了する。
+### 3.1. users（ユーザー情報）
+
+Firebase Authと連携するユーザーの基本情報、プラン状態、共通リマインド設定を一括管理する。**`plan_status` / `monthly_scan_count` / `remind_days_before` はこのテーブルで管理する。**
+
+| カラム名（論理） | 物理名 | データ型 | 制約 | 初期値 | 説明 |
+|---|---|---|---|---|---|
+| ユーザーID | `id` | **UUID** | PRIMARY KEY | `gen_random_uuid()` | 内部管理用PK |
+| Firebase UID | `firebase_uid` | VARCHAR(128) | UNIQUE, NOT NULL | - | Firebase Authから発行されるUID |
+| メールアドレス | `email` | VARCHAR(255) | UNIQUE, NOT NULL | - | ログイン・リマインド送信先メールアドレス（`notification_schedules.user_id` から参照される） |
+| プランステータス | `plan_status` | VARCHAR(50) | NOT NULL | `'free'` | `'free'` / `'premium'` など |
+| 月間スキャン数 | `monthly_scan_count` | INTEGER | NOT NULL | `0` | 毎月1日AM0:00にCelery Beatで0にリセット |
+| リマインド設定日数 | `remind_days_before` | INTEGER | NOT NULL | `3` | 期限の何日前に通知するか（デフォルト3日前） |
+| 作成日時 | `created_at` | TIMESTAMP | NOT NULL | `CURRENT_TIMESTAMP` | アカウント作成日時 |
+
+### 3.2. groups（共有グループ情報）
+
+書類を共有する器。1人利用時も「個人グループ」として自動生成される。
+
+| カラム名（論理） | 物理名 | データ型 | 制約 | 初期値 | 説明 |
+|---|---|---|---|---|---|
+| グループID | `id` | **UUID** | PRIMARY KEY | `gen_random_uuid()` | グループPK |
+| グループ名 | `name` | VARCHAR(100) | NOT NULL | - | 例:「〇〇さんのマイグループ」 |
+| 作成者ユーザーID | `created_by` | **UUID** | FOREIGN KEY, NOT NULL | - | `users.id` へ接続。このユーザーのみグループ削除可能 |
+| 作成日時 | `created_at` | TIMESTAMP | NOT NULL | `CURRENT_TIMESTAMP` | グループ作成日時 |
+
+### 3.3. group_members（グループ所属情報）
+
+グループとユーザーの中間テーブル。権限（role）の概念はなく、所属者は一律で全操作が可能。
+
+| カラム名（論理） | 物理名 | データ型 | 制約 | 初期値 | 説明 |
+|---|---|---|---|---|---|
+| 所属ID | `id` | **UUID** | PRIMARY KEY | `gen_random_uuid()` | 中間テーブルPK |
+| グループID | `group_id` | **UUID** | FOREIGN KEY, NOT NULL | - | `groups.id` へ接続（ON DELETE CASCADE） |
+| ユーザーID | `user_id` | **UUID** | FOREIGN KEY, NOT NULL | - | `users.id` へ接続（ON DELETE CASCADE） |
+| 参加日時 | `joined_at` | TIMESTAMP | NOT NULL | `CURRENT_TIMESTAMP` | グループに参加した日時 |
+
+> **複合ユニーク制約**：`(group_id, user_id)` の組み合わせは一意とする。
+
+### 3.4. invitations（グループ招待管理）
+
+他のユーザーを共有グループに引き入れるための招待トークン・状態管理。
+
+| カラム名（論理） | 物理名 | データ型 | 制約 | 初期値 | 説明 |
+|---|---|---|---|---|---|
+| 招待ID | `id` | **UUID** | PRIMARY KEY | `gen_random_uuid()` | 招待PK |
+| グループID | `group_id` | **UUID** | FOREIGN KEY, NOT NULL | - | `groups.id` へ接続（ON DELETE CASCADE） |
+| 招待元ユーザーID | `invited_by` | **UUID** | FOREIGN KEY, NOT NULL | - | `users.id` へ接続 |
+| 招待先メールアドレス | `invitee_email` | VARCHAR(255) | NOT NULL | - | 招待を送る対象のメールアドレス |
+| ステータス | `status` | VARCHAR(20) | NOT NULL | `'pending'` | `'pending'` / `'accepted'` / `'rejected'` |
+| 招待トークン | `token` | VARCHAR(255) | UNIQUE, NOT NULL | - | URL検証用の一意なトークン文字列 |
+| 作成日時 | `created_at` | TIMESTAMP | NOT NULL | `CURRENT_TIMESTAMP` | 招待URL発行日時 |
+| 有効期限 | `expires_at` | TIMESTAMP | NOT NULL | - | 招待URLの有効期限（24時間後など） |
+
+### 3.5. categories（カテゴリマスタ）
+
+書類のカテゴリ。`group_id` が NULL のものはシステム共通、値があるものはグループ固有カテゴリ。
+
+| カラム名（論理） | 物理名 | データ型 | 制約 | 初期値 | 説明 |
+|---|---|---|---|---|---|
+| カテゴリID | `id` | **UUID** | PRIMARY KEY | `gen_random_uuid()` | カテゴリPK |
+| グループID | `group_id` | **UUID** | FOREIGN KEY | NULL | `groups.id` へ接続（NULL許容：共通マスタ用） |
+| カテゴリ名 | `name` | VARCHAR(50) | NOT NULL | - | 「学校」「医療」「行政」「保険」「その他」など |
+| カラーコード | `color_code` | VARCHAR(7) | - | NULL | カレンダー表示用のカラー（例: `#FF5733`） |
+
+> **初期シードデータ（必須）**：`group_id = NULL` とした状態で、「学校」「医療」「行政」「保険」「その他」の5レコードをシステム起動時に投入すること。
+
+### 3.6. documents（書類情報）
+
+ユーザーが撮影した書類データ。AIによる解析結果、およびユーザーの修正内容を保持。
+
+| カラム名（論理） | 物理名 | データ型 | 制約 | 初期値 | 説明 |
+|---|---|---|---|---|---|
+| 書類ID | `id` | **UUID** | PRIMARY KEY | `gen_random_uuid()` | 書類PK |
+| グループID | `group_id` | **UUID** | FOREIGN KEY, NOT NULL | - | `groups.id` へ接続。書類はグループに帰属する |
+| カテゴリID | `category_id` | **UUID** | FOREIGN KEY | NULL | `categories.id` へ接続（NULL許容） |
+| タイトル | `title` | VARCHAR(255) | - | NULL | AI抽出または手入力された書類名 |
+| 画像URL | `image_url` | TEXT | NOT NULL | - | Cloudinaryに保存された画像の署名付きURL（一時） |
+| 期限有無フラグ | `has_deadline` | BOOLEAN | NOT NULL | `false` | 期限があるタスクかどうかの判定 |
+| 期限日 | `deadline_date` | DATE | - | NULL | `has_deadline` が true の場合の期日 |
+| 済スタンプフラグ | `is_done` | BOOLEAN | NOT NULL | `false` | true の場合、カレンダー上でグレーアウト表現 |
+| 登録者ユーザーID | `created_by` | **UUID** | FOREIGN KEY, NOT NULL | - | `users.id` へ接続（撮影・登録した本人） |
+| 作成日時 | `created_at` | TIMESTAMP | NOT NULL | `CURRENT_TIMESTAMP` | 書類の登録日時 |
+
+### 3.7. app_notifications（アプリ内お知らせデータ）
+
+誰かが書類を登録した際に、同じグループの他メンバーのベルマーク（🔔）に届く通知ログ。
+
+| カラム名（論理） | 物理名 | データ型 | 制約 | 初期値 | 説明 |
+|---|---|---|---|---|---|
+| 通知ID | `id` | **UUID** | PRIMARY KEY | `gen_random_uuid()` | 通知PK |
+| グループID | `group_id` | **UUID** | FOREIGN KEY, NOT NULL | - | `groups.id` へ接続 |
+| トリガーユーザーID | `triggered_by` | **UUID** | FOREIGN KEY, NOT NULL | - | `users.id`（書類を登録したユーザー本人） |
+| 書類ID | `document_id` | **UUID** | FOREIGN KEY, NOT NULL | - | `documents.id` へ接続（ON DELETE CASCADE） |
+| メッセージ本文 | `message` | TEXT | NOT NULL | - | 例：「〇〇さんが書類を登録しました」 |
+| 既読フラグ | `is_read` | BOOLEAN | NOT NULL | `false` | 個別タップで true に更新 |
+| 作成日時 | `created_at` | TIMESTAMP | NOT NULL | `CURRENT_TIMESTAMP` | 新着順（降順）ソート用の必須カラム |
+
+### 3.8. notification_schedules（メールリマインド管理）
+
+Celery Workerが定期実行時にスキャンするリマインドキュー。**`user_id` が「誰に送るか」を一意に示すカラムであり、メールアドレスは持たない。**
+
+| カラム名（論理） | 物理名 | データ型 | 制約 | 初期値 | 説明 |
+|---|---|---|---|---|---|
+| タスクID | `id` | **UUID** | PRIMARY KEY | `gen_random_uuid()` | リマインドタスクPK |
+| 書類ID | `document_id` | **UUID** | FOREIGN KEY, NOT NULL | - | `documents.id` へ接続（ON DELETE CASCADE） |
+| 対象ユーザーID | `user_id` | **UUID** | FOREIGN KEY, NOT NULL | - | `users.id` へ接続。**送信先の特定キー**。Celeryはこの`user_id`から`users.email`を取得して送信する |
+| 送信予定日時 | `scheduled_for` | TIMESTAMP | NOT NULL | - | 書類の `deadline_date` から逆算された送信日時 |
+| ステータス | `status` | VARCHAR(20) | NOT NULL | `'pending'` | `'pending'` / `'sent'` / `'failed'` / `'cancelled'` |
+| リトライ回数 | `retry_count` | INTEGER | NOT NULL | `0` | 外部通信（SendGrid）失敗時にインクリメント（最大3） |
+| 作成日時 | `created_at` | TIMESTAMP | NOT NULL | `CURRENT_TIMESTAMP` | タスクの生成日時（ログ・デバッグ用） |
+
+> **ステータス連動ロジック（重要）**：書類（`documents`）の `is_done`（済スタンプ）が `true` に更新された、または書類自体が削除された場合、該当する `document_id` かつ `status = 'pending'` のレコードはバックエンド処理によって即座に `'cancelled'` へ一括更新すること。
+
+---
+
+## 4. 主要なインデックス（パフォーマンス・チューニング）
+
+検索の高速化およびCelery等のバッチ処理最適化のため、以下のインデックス（INDEX）を付与することを推奨する。
+
+| 対象 | 目的 |
+|---|---|
+| `users(firebase_uid)` | Firebase認証時のユーザー特定を高速化（UNIQUE制約により自動生成）。 |
+| `group_members(user_id)` / `group_members(group_id)` | ユーザーの所属グループ一覧、およびグループ内のメンバー一覧の取得高速化。 |
+| `documents(group_id, deadline_date)` | カレンダー画面（UI-002）での月間スケジュール高速抽出。 |
+| `app_notifications(group_id, created_at DESC)` | 他メンバーのマイページで🔔マークの新着通知をソートして高速表示するため。 |
+| `notification_schedules(scheduled_for, status)` | Celery Workerが「送信予定日時を過ぎている ＆ pending 状態」のタスクを毎時（あるいは数分おきに）検索するバッチ処理の負荷を軽減するため。 |
+| `notification_schedules(user_id)` | 「済スタンプ」押下時など、特定ユーザー宛のリマインドを検索・更新する際の高速化（補足追加）。 |

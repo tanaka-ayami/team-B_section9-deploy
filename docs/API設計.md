@@ -1,35 +1,80 @@
-# API 設計書
+# API設計書（v2.0）
 
-> OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイルは `backend/openapi.yaml` で管理し、本ドキュメントは概要、エンドポイント一覧、および運用ルールを示す。
+データベース設計書（v1.1）および要件定義書（v7.2）との整合性を取って再設計したAPI設計書。
+
+OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイルは `backend/openapi.yaml` で管理し、本ドキュメントは概要、エンドポイント一覧、および運用ルールを示す。
 
 ---
 
 ## 1. 設計方針
 
 - **スタイル**：REST API
-- **認証方式**：Firebase IDトークンによるJWT認証。フロントエンドは HTTP ヘッダーに `Authorization: Bearer <Firebase_ID_Token>` を付与する。バックエンドは Firebase Admin SDK を用いてトークンを検証し、`users.firebase_uid` からユーザーを特定する。
-- **バージョニング**：URL 埋め込み（`/v1/...`）
+- **認証方式**：Firebase IDトークンによるJWT認証。
+  - フロントエンドはHTTPヘッダーに `Authorization: Bearer <Firebase_ID_Token>` を付与する。
+  - バックエンドはFirebase Admin SDKを用いてトークンを検証し、`users.firebase_uid` からユーザーを特定する（FR-001）。
+- **バージョニング**：URL埋め込み（`/v1/...`）
+- **識別子のデータ型**：DB設計書との整合性を担保するため、すべてのリソースID（`user_id`, `group_id`, `document_id`, `category_id` 等）には **UUID形式の文字列** を採用する。
+- **権限モデル**：グループ内メンバーは一律同等権限（書類の登録・編集・削除が可能）。**グループ自体の削除のみ `groups.created_by` のユーザーに制限**する（要件定義書 4章・FR-002）。
 - **エラーレスポンスの共通フォーマット**：すべてのエラー（4xx, 5xx）は一意のエラーコードを含むJSON形式で統一する。
 
 ---
 
 ## 2. エンドポイント一覧
 
+### ユーザー・認証
+
 | メソッド | パス | 概要 | 認証 | 備考 |
-| :--- | :--- | :--- | :--- | :--- |
-| POST | `/v1/auth/signup` | 新規ユーザー登録＆初期化 | 必要 | Firebase認証後、DBにユーザー作成＆個人グループと初期カテゴリを自動生成。 |
-| GET | `/v1/users/me` | 自身のユーザー情報取得 | 必要 | 残りスキャン枚数やリマインド日数設定を含む。 |
-| PATCH | `/v1/users/me` | リマインド日数等の設定更新 | 必要 | リマインド設定日数（N日前）を変更。 |
-| POST | `/v1/documents/scan` | 書類画像のアップロード＆AI解析 | 必要 | 署名付きURL発行・OpenAI解析を実行（AI解析失敗時は OPENAI_API_FAILED（500）を返す。
-フロントは空欄の確認画面を表示して手入力に誘導する。）。 |
-| POST | `/v1/documents` | 書類データの最終登録 | 必要 | 解析確認画面からの登録。カレンダー即時反映＆リマインド生成。 |
-| GET | `/v1/documents` | 書類一覧取得（カレンダー/期限なし） | 必要 | 所属グループの書類一覧（FullCalendar同期用・カテゴリ絞り込み可）。 |
-| PATCH | `/v1/documents/{id}` | 書類編集 / 済スタンプON・OFF | 必要 | 済ONで `notification_schedules` を `cancelled` へ。 |
-| DELETE | `/v1/documents/{id}` | 書類削除 | 必要 | 書類物理削除＆未送信リマインドを `cancelled` へ。 |
-| GET | `/v1/notifications` | アプリ内お知らせ一覧取得 | 必要 | 他ユーザーが登録したお知らせを新着順で取得。 |
-| PATCH | `/v1/notifications/{id}/read` | お知らせの既読化 | 必要 | お知らせを個別タップした際の既読更新用。 |
-| POST | `/v1/groups` | 共有グループの新規作成 | 必要 | 家族などのグループ作成（作成者が `created_by` となる）。 |
-| POST | `/v1/groups/{id}/invite` | グループへの招待発行 | 必要 | `invitations` レコードおよびSendGridで招待リンクを送信。 |
+|---|---|---|---|---|
+| POST | `/v1/auth/signup` | 新規ユーザー登録＆初期化 | 必要 | Firebase認証後、`users` 作成＆「個人グループ」を自動生成（FR-001）。 |
+| GET | `/v1/users/me` | 自身のユーザー情報取得 | 必要 | `plan_status` / `monthly_scan_count` / `remind_days_before` を含む。 |
+| PATCH | `/v1/users/me` | リマインド日数等の設定更新 | 必要 | `remind_days_before` を変更（UI-006）。 |
+
+### グループ・招待
+
+| メソッド | パス | 概要 | 認証 | 備考 |
+|---|---|---|---|---|
+| GET | `/v1/groups` | 所属グループ一覧取得 | 必要 | 個人グループ・共有グループの両方を含む。 |
+| POST | `/v1/groups` | 共有グループの新規作成 | 必要 | 作成者は `created_by` に記録され、同時に `group_members` へ自動登録（FR-002）。 |
+| DELETE | `/v1/groups/{id}` | グループ削除 | 必要 | `created_by` のユーザーのみ実行可能。他メンバーは `FORBIDDEN_GROUP_ACTION`。 |
+| GET | `/v1/groups/{id}/members` | グループメンバー一覧取得 | 必要 | 設定画面（UI-006）でのメンバー表示用。 |
+| POST | `/v1/groups/{id}/invite` | グループへの招待発行 | 必要 | `invitations` レコード作成＆SendGridで招待リンクを送信（FR-002）。 |
+| GET | `/v1/invitations/{token}` | 招待情報の取得 | 不要 | 招待ページ表示用（招待元・グループ名の確認）。 |
+| POST | `/v1/invitations/{token}/accept` | 招待の承諾 | 必要 | `group_members` へ追加し、`status` を `accepted` へ更新。 |
+| POST | `/v1/invitations/{token}/reject` | 招待の拒否 | 必要 | `status` を `rejected` へ更新。 |
+
+### カテゴリ
+
+| メソッド | パス | 概要 | 認証 | 備考 |
+|---|---|---|---|---|
+| GET | `/v1/categories` | カテゴリ一覧取得 | 必要 | 共通カテゴリ（`group_id IS NULL`）＋所属グループ固有カテゴリ（FR-010）。 |
+| POST | `/v1/categories` | グループ固有カテゴリの作成 | 必要 | `group_id` を必須とし、共通カテゴリは作成不可。 |
+| PATCH | `/v1/categories/{id}` | カテゴリ編集 | 必要 | グループ固有カテゴリのみ編集可能。共通カテゴリは `FORBIDDEN_GROUP_ACTION`。 |
+| DELETE | `/v1/categories/{id}` | カテゴリ削除 | 必要 | グループ固有カテゴリのみ削除可能。 |
+
+### 書類
+
+| メソッド | パス | 概要 | 認証 | 備考 |
+|---|---|---|---|---|
+| POST | `/v1/documents/scan` | 書類画像のアップロード＆AI解析 | 必要 | 署名付きURL発行＆OpenAI解析を実行（FR-003）。失敗時は `OPENAI_API_FAILED`（500）。フロントは空欄の確認画面を表示して手入力に誘導する。 |
+| POST | `/v1/documents` | 書類データの最終登録 | 必要 | 解析確認画面からの登録（FR-004）。カレンダー即時反映＆各グループメンバー向けの `notification_schedules` / `app_notifications` を自動生成。 |
+| GET | `/v1/documents` | 書類一覧取得 | 必要 | `has_deadline` / `category_id` / `year` / `month` 等で絞り込み可能（カレンダー同期・期限なし書類一覧の両方に対応／FR-005, FR-007）。 |
+| GET | `/v1/documents/{id}` | 書類詳細取得 | 必要 | 詳細画面（UI-005）用。 |
+| PATCH | `/v1/documents/{id}` | 書類編集 / 済スタンプON・OFF | 必要 | `is_done: true` で、関連する全ユーザーの `notification_schedules`（`status='pending'`）を `cancelled` へ一括更新（FR-006）。 |
+| DELETE | `/v1/documents/{id}` | 書類削除 | 必要 | 物理削除。関連する `notification_schedules` / `app_notifications` も連動して削除（ON DELETE CASCADE）。 |
+
+### アプリ内お知らせ
+
+| メソッド | パス | 概要 | 認証 | 備考 |
+|---|---|---|---|---|
+| GET | `/v1/notifications` | アプリ内お知らせ一覧取得 | 必要 | `created_at` 降順。登録した本人には自分の登録通知を表示しない（FR-009）。 |
+| PATCH | `/v1/notifications/{id}/read` | お知らせの既読化 | 必要 | 個別タップ時の既読更新用。 |
+
+### 課金（Stripe）
+
+| メソッド | パス | 概要 | 認証 | 備考 |
+|---|---|---|---|---|
+| POST | `/v1/billing/checkout-session` | Stripe決済セッション作成 | 必要 | 月間スキャン上限超過時の有料プラン導線（FR-011）。 |
+| POST | `/v1/billing/webhook` | Stripe Webhook受信 | 不要（署名検証） | 決済完了イベントを受け、`users.plan_status` を `'premium'` 等へ更新。 |
 
 ---
 
@@ -37,7 +82,7 @@
 
 ### ① 新規ユーザー登録＆初期化 `POST /v1/auth/signup`
 
-フロントエンドでFirebase Authのサインアップが完了した直後にコールする。バックエンド側で `users` レコードの作成、個人グループの自動生成、初期カテゴリのシーディングを一括で行う。
+Firebase Authのサインアップ完了直後にコールする。`users` レコード作成、個人グループの自動生成を一括で行う。
 
 ```http
 POST /v1/auth/signup
@@ -46,7 +91,7 @@ Content-Type: application/json
 ```
 
 ```json
-// Request Body（空オブジェクト、または初期プロファイル情報）
+// Request Body（空オブジェクト）
 {}
 ```
 
@@ -54,24 +99,22 @@ Content-Type: application/json
 // Response Body (201 Created)
 {
   "user": {
-    "id": 1,
+    "id": "4a7b9c3d-e2f1-4b5a-8c9d-0e1f2a3b4c5d",
     "email": "user@example.com",
-    "remind_days_before": 3,
     "plan_status": "free",
-    "monthly_scan_count": 0
+    "monthly_scan_count": 0,
+    "remind_days_before": 3
   },
   "personal_group": {
-    "id": 101,
+    "id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
     "name": "user@example.com のマイグループ"
   }
 }
 ```
 
----
-
 ### ② 書類画像のアップロード＆AI解析 `POST /v1/documents/scan`
 
-スマホで撮影した画像（バイナリ）を受け取り、Cloudinaryへ保存して署名付きURLを発行後、OpenAI API（Structured Outputs）で解析した結果を返す。
+画像（バイナリ）を受け取り、Cloudinaryへ保存して署名付きURLを発行後、OpenAI APIで解析した結果を返す。「宛先」フィールドは解析対象外（要件定義書 FR-003）。
 
 ```http
 POST /v1/documents/scan
@@ -94,11 +137,11 @@ Content-Type: multipart/form-data
 }
 ```
 
----
+> `category` はカテゴリ名の文字列で返る（付録のStructured Outputsスキーマに準拠）。フロントエンドは `GET /v1/categories` の結果と名称マッチングして `category_id`（UUID）を解決し、③の登録APIに渡す。
 
 ### ③ 書類データの最終登録 `POST /v1/documents`
 
-解析確認画面（UI-004）でユーザーが修正・確定したデータをDBへ登録する。登録完了に伴い、グループメンバーへのお知らせ（🔔）作成およびメールリマインドスケジュールが自動作成される。
+解析確認画面でユーザーが修正・確定したデータをDBへ登録する。登録に伴い、グループ内全ユーザー（各自の `remind_days_before` に応じたスケジュール）への `notification_schedules`、および本人以外のメンバーへの `app_notifications` が自動生成される。
 
 ```http
 POST /v1/documents
@@ -109,11 +152,11 @@ Content-Type: application/json
 ```json
 // Request Body
 {
-  "group_id": 101,
+  "group_id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
+  "category_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
   "title": "遠足のお知らせ（修正済）",
-  "category": "学校",
-  "deadline_date": "2026-07-01",
   "has_deadline": true,
+  "deadline_date": "2026-07-01",
   "image_url": "https://res.cloudinary.com/example/image/authenticated/s--abc--/v1/document.jpg"
 }
 ```
@@ -121,24 +164,24 @@ Content-Type: application/json
 ```json
 // Response Body (201 Created)
 {
-  "id": 501,
-  "group_id": 101,
+  "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+  "group_id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
+  "category_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
   "title": "遠足のお知らせ（修正済）",
-  "category": "学校",
+  "has_deadline": true,
   "deadline_date": "2026-07-01",
-  "is_completed": false,
-  "created_at": "2026-06-13T00:42:32Z"
+  "is_done": false,
+  "created_by": "4a7b9c3d-e2f1-4b5a-8c9d-0e1f2a3b4c5d",
+  "created_at": "2026-06-22T00:42:32Z"
 }
 ```
 
----
-
 ### ④ 済スタンプの切り替え `PATCH /v1/documents/{id}`
 
-詳細画面（UI-005）での「済スタンプ」のトグル操作を反映する。`is_completed: true` となった場合、バックエンド側で対象書類の `pending` 状態のリマインドを即座に `cancelled` へ更新する。
+詳細画面（UI-005）での「済スタンプ」トグル操作を反映する。`is_done: true` の場合、対象書類に関連するすべての送信予定リマインド（`notification_schedules` 内の `status: 'pending'`）を即座に `cancelled` へ更新する。
 
 ```http
-PATCH /v1/documents/501
+PATCH /v1/documents/2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
 Authorization: Bearer <Firebase_ID_Token>
 Content-Type: application/json
 ```
@@ -146,16 +189,84 @@ Content-Type: application/json
 ```json
 // Request Body
 {
-  "is_completed": true
+  "is_done": true
 }
 ```
 
 ```json
 // Response Body (200 OK)
 {
-  "id": 501,
-  "is_completed": true,
+  "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+  "is_done": true,
   "message": "済スタンプが適用されました。未送信のリマインドメールはキャンセルされました。"
+}
+```
+
+### ⑤ グループ招待の発行と承諾 `POST /v1/groups/{id}/invite` → `POST /v1/invitations/{token}/accept`
+
+招待発行時、`invitations` レコードを作成し、SendGridで招待リンク（`token` を含むURL）を送信する。
+
+```http
+POST /v1/groups/8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d/invite
+Authorization: Bearer <Firebase_ID_Token>
+Content-Type: application/json
+```
+
+```json
+// Request Body
+{
+  "invitee_email": "family@example.com"
+}
+```
+
+```json
+// Response Body (201 Created)
+{
+  "id": "9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+  "group_id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
+  "invitee_email": "family@example.com",
+  "status": "pending",
+  "expires_at": "2026-06-23T00:42:32Z"
+}
+```
+
+招待を受け取ったユーザーがリンクをタップし、ログイン後に承諾する。
+
+```http
+POST /v1/invitations/3f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c/accept
+Authorization: Bearer <Firebase_ID_Token>
+```
+
+```json
+// Response Body (200 OK)
+{
+  "group_id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
+  "status": "accepted",
+  "message": "グループに参加しました。"
+}
+```
+
+### ⑥ アプリ内お知らせ一覧取得 `GET /v1/notifications`
+
+ヘッダーの「🔔」表示用。自分が登録した書類の通知は自分には表示されない（要件定義書 4章-7）。
+
+```http
+GET /v1/notifications
+Authorization: Bearer <Firebase_ID_Token>
+```
+
+```json
+// Response Body (200 OK)
+{
+  "notifications": [
+    {
+      "id": "5d4c3b2a-1f0e-9d8c-7b6a-5c4d3e2f1a0b",
+      "document_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      "message": "〇〇さんが書類を登録しました",
+      "is_read": false,
+      "created_at": "2026-06-22T00:42:32Z"
+    }
+  ]
 }
 ```
 
@@ -163,7 +274,7 @@ Content-Type: application/json
 
 ## 4. エラーレスポンス
 
-エラー時は一律で HTTP ステータスコードを適切に分類し、以下の共通構造を持つ JSON を返却する。
+エラー時は一律でHTTPステータスコードを適切に分類し、以下の共通構造を持つJSONを返却する。
 
 ```json
 {
@@ -176,24 +287,24 @@ Content-Type: application/json
 
 ### 主な共通エラーコード一覧
 
-| HTTP ステータス | エラーコード（`code`） | 発生条件 / 理由 |
-| :--- | :--- | :--- |
+| HTTPステータス | エラーコード（code） | 発生条件 / 理由 |
+|---|---|---|
 | 401 Unauthorized | `UNAUTHORIZED` | Firebase IDトークンが無効、期限切れ、または未設定。 |
-| 403 Forbidden | `FORBIDDEN_GROUP_ACTION` | 他人のグループの書類へのアクセス、または作成者以外によるグループ削除操作。 |
-| 404 Not Found | `RESOURCE_NOT_FOUND` | 指定された書類（`document_id`）やグループが存在しない。 |
+| 403 Forbidden | `FORBIDDEN_GROUP_ACTION` | 作成者（`created_by`）以外によるグループ削除操作、または共通カテゴリの編集・削除操作。 |
+| 404 Not Found | `RESOURCE_NOT_FOUND` | 指定された書類（`document_id`）、グループ、カテゴリ等が存在しない。 |
+| 410 Gone | `INVITATION_EXPIRED` | `invitations.expires_at` を過ぎた招待トークンへのアクセス。 |
 | 422 Unprocessable | `SCAN_LIMIT_EXCEEDED` | 当月の無料スキャン上限（`monthly_scan_count`）を超過（Stripeへの導線トリガー）。 |
-| 500 Internal Error | `OPENAI_API_FAILED` | OpenAI APIのエラーが指数バックオフ（3回リトライ）後も解消しなかった場合。 |
+| 500 Internal Error | `OPENAI_API_FAILED` | OpenAI APIのエラーが指数バックオフ（最大3回リトライ）後も解消しなかった場合。 |
 
 ---
 
 ## 5. レート制限・冪等性
 
 ### レート制限の方針
-
-- 一般的なAPIエンドポイント（GETなど）は、Redisを用いてユーザー（`firebase_uid`）あたり **1分間に最大 120リクエスト** に制限する。
-- AI解析エンドポイント（`POST /v1/documents/scan`）は、OpenAI APIの負荷およびコスト管理の観点から、**1分間に最大 5リクエスト** の厳格な制限を設ける。
+- 一般的なAPIエンドポイント（GETなど）は、Redisを用いてユーザー（`firebase_uid`）あたり **1分間に最大120リクエスト** に制限する。
+- AI解析エンドポイント（`POST /v1/documents/scan`）は、OpenAI APIの負荷およびコスト管理の観点から、**1分間に最大5リクエスト** の厳格な制限を設ける。
 
 ### POST / PATCH に対する冪等性の扱い
-
-- **書類登録（`POST /v1/documents`）**：モバイル通信の瞬断等による重複登録を防ぐため、フロントエンドは画面遷移時に生成した一意のUUIDをヘッダー `X-Idempotency-Key` に付与して送信することを推奨とする。バックエンドは同一キーによる2重リクエストを検知した場合、初回と同じレスポンス（201）を即座に返却して多重インサートを防ぐ。
-- **済スタンプ等の PATCH リクエスト**：状態の「上書き」であるため冪等キーは不要（何度リクエストしても最終的な状態は変わらないため）。
+- **書類登録（`POST /v1/documents`）**：モバイル通信の瞬断等による重複登録を防ぐため、フロントエンドは画面遷移時に生成した一意のUUIDをヘッダー `X-Idempotency-Key` に付与して送信することを推奨とする。バックエンドは同一キーによる2重リクエストを検知した場合、初回と同じレスポンス（201）を即座に返却する。
+- **済スタンプ等のPATCHリクエスト**：状態の「上書き」であるため冪等キーは不要（何度リクエストしても最終的な状態は変わらないため）。
+- **Stripe Webhook（`POST /v1/billing/webhook`）**：Stripeが送信する `event.id` を用いて重複イベント処理を防止する（同一イベントの再送に対して二重課金処理が起きないようにする）。
