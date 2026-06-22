@@ -74,14 +74,19 @@ export function AuthForm() {
       await registerWithEmail(email, password);
       const token = await getIdToken();
       const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-      await fetch(`${base}/v1/auth/signup`, {
+      const res = await fetch(`${base}/v1/auth/signup`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({}),
       });
+
+      if (!res.ok) {
+        throw new Error(`サーバーエラーが発生しました（${res.status}）`);
+      }
+
       router.replace("/calendar");
     } catch (e) {
       setError(e instanceof FirebaseError ? firebaseErrorToJa(e.code) : "エラーが発生しました");
