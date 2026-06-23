@@ -5,6 +5,7 @@ import os
 from fastapi import APIRouter, UploadFile, File
 
 from app.services.cloudinary_service import upload_document_image
+from app.services.openai_service import analyze_document_image
 
 router = APIRouter()
 
@@ -12,8 +13,7 @@ router = APIRouter()
 @router.post("/v1/documents/scan")
 async def scan_document(file: UploadFile = File(...)):
     """
-    書類画像を受け取り、Cloudinaryにアップロードして署名付きURLを返す。
-    AI解析（OpenAI）はこの時点では未実装。issue #19で追加予定。
+    書類画像を受け取り、Cloudinaryへ保存しつつOpenAIで内容を解析する。
     """
     tmp_path = None
 
@@ -24,14 +24,15 @@ async def scan_document(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, tmp)
             tmp_path = tmp.name
 
-        result = upload_document_image(tmp_path)
+        upload_result = upload_document_image(tmp_path)
     finally:
-        # 一時ファイルが作成されていた場合のみ削除する
         if tmp_path is not None and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+    # OpenAIで画像を解析する（失敗時はNoneが返る）
+    analysis = analyze_document_image(upload_result["image_url"])
+
     return {
-        "image_url": result["image_url"],
-        "ai_analysis": None  # issue #19で実装予定
+        "image_url": upload_result["image_url"],
+        "ai_analysis": analysis.model_dump() if analysis else None,
     }
-    
