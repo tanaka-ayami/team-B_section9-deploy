@@ -3,9 +3,6 @@ GET /users/me
 
 Week1ゴール「ログイン→JWT取得→カレンダー画面遷移」の確認用。
 今はDBにまだ書き込まず、Firebaseトークンの中身をそのまま返すだけ。
-→ Alembicでusersテーブルができたら、ここで
-   「DBにfirebase_uidが無ければ作成（個人グループも自動生成）」
-   というロジックを追加する。今はTODOコメントで明示しておく。
 """
 from fastapi import APIRouter, Depends
 
