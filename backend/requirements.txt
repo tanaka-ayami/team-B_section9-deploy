@@ -8,11 +8,8 @@ celery
 redis
 cloudinary
 python-multipart
-<<<<<<< HEAD
 openai
-=======
 firebase-admin
 pydantic-settings
 pytest
 httpx
->>>>>>> 8cede4d (BE1: FastAPIスキャフォールド・Firebase JWT検証・MVPモデル定義を追加、.env.exampleをdevelopに合わせて修正)
