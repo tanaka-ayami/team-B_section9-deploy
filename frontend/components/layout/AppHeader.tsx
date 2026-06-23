@@ -14,7 +14,7 @@ export function AppHeader({
   onBellClick,
 }: AppHeaderProps) {
   return (
-    <header className="px-4 pt-12 pb-4" style={{ backgroundColor: "#7A9E7E" }}>
+    <header className="px-4 pt-12 pb-4 bg-[#557C79]">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-medium text-white leading-tight">
@@ -40,7 +40,7 @@ export function AppHeader({
           </svg>
           {unreadCount > 0 && (
             <span
-              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-red-500 flex items-center justify-center text-white"
+              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-white bg-[#D45D1E]"
               style={{ fontSize: "10px", fontWeight: 500 }}
             >
               {unreadCount > 99 ? "99+" : unreadCount}

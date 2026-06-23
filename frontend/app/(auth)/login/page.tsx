@@ -2,10 +2,9 @@ import { AuthForm } from "@/components/auth/AuthForm";
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-screen">
+    <div className="min-h-screen flex flex-col bg-[#f2f1ec]">
       <div
-        className="flex flex-col items-center justify-center flex-[2] pt-14 pb-10 px-6"
-        style={{ backgroundColor: "#4A7C59" }}
+        className="flex flex-col items-center justify-center flex-[2] pt-14 pb-10 px-6 bg-[#557C79]"
       >
         <div
           className="w-[72px] h-[72px] rounded-[18px] flex items-center justify-center mb-4"

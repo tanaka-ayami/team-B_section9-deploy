@@ -56,25 +56,29 @@ export default function CalendarPage() {
   });
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F5F6F2" }}>
+    <div className="min-h-screen bg-[#f2f1ec]">
       <AppHeader
         groupName="山田ファミリー"
         yearMonth={`${currentYear}年${currentMonth}月`}
         unreadCount={2}
       />
-      <CalendarView
-        events={calendarEvents}
-        onMonthChange={(y, m) => {
-          setCurrentYear(y);
-          setCurrentMonth(m);
-        }}
-      />
+      <div className="px-4 pt-4">
+        <div className="bg-white rounded-[18px] overflow-hidden">
+          <CalendarView
+            events={calendarEvents}
+            onMonthChange={(y, m) => {
+              setCurrentYear(y);
+              setCurrentMonth(m);
+            }}
+          />
+        </div>
+      </div>
       <section className="px-4 pt-4 pb-2">
-        <p className="text-xs mb-3" style={{ color: "#6B7C6F" }}>
+        <p className="text-xs mb-3 text-[#557C79] opacity-60">
           {currentYear}年{currentMonth}月の書類
         </p>
         {monthlyDocuments.length === 0 ? (
-          <p className="text-sm text-center py-8" style={{ color: "#9BA89D" }}>
+          <p className="text-sm text-center py-8 text-[#8fa09e]">
             この月の書類はありません
           </p>
         ) : (
