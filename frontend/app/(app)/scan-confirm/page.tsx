@@ -57,9 +57,9 @@ export default function ScanConfirmPage() {
   if (!scanResult) return null;
 
   return (
-    <div className="min-h-screen pb-8" style={{ backgroundColor: "#F5F6F2" }}>
+    <div className="min-h-screen pb-8 bg-[#f2f1ec]">
       {/* ヘッダー */}
-      <div className="flex items-center px-4 pt-12 pb-4" style={{ backgroundColor: "#7A9E7E" }}>
+      <div className="flex items-center px-4 pt-12 pb-4 bg-[#557C79]">
         <button
           type="button"
           onClick={() => router.back()}
@@ -76,13 +76,12 @@ export default function ScanConfirmPage() {
       <div className="px-4 pt-4 space-y-4">
         {/* 画像プレビュー */}
         {scanResult.image_url && (
-          <div className="relative rounded-2xl overflow-hidden bg-white border"
-            style={{ borderColor: "#C8D4C9" }}>
+          <div className="relative rounded-2xl overflow-hidden bg-white border border-[#D2D4BC]">
             <img src={scanResult.image_url} alt="書類" className="w-full object-contain max-h-48"/>
             <span
               className="absolute top-2 right-2 text-xs px-2 py-1 rounded-full font-medium"
               style={isAnalyzed
-                ? { backgroundColor: "#EEF1EC", color: "#4A7C59" }
+                ? { backgroundColor: "#f2f1ec", color: "#557C79" }
                 : { backgroundColor: "#FCEBEB", color: "#E24B4A" }}
             >
               {isAnalyzed ? "✦ AI解析済み" : "⚠ 解析失敗"}
@@ -100,34 +99,32 @@ export default function ScanConfirmPage() {
 
         {/* 書類タイトル */}
         <div>
-          <p className="text-xs font-medium mb-1.5" style={{ color: "#6B7C6F" }}>書類タイトル</p>
+          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">書類タイトル</p>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="タイトルを入力してください"
-            className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+            className="w-full rounded-2xl px-4 py-3 text-sm outline-none bg-white text-[#1F2D24]"
             style={{
-              backgroundColor: "#fff",
-              border: `1px solid ${!title.trim() ? "#E24B4A" : "#C8D4C9"}`,
-              color: "#1F2D24",
+              border: `1px solid ${!title.trim() ? "#E24B4A" : "#D2D4BC"}`,
             }}
           />
         </div>
 
         {/* カテゴリ */}
         <div>
-          <p className="text-xs font-medium mb-1.5" style={{ color: "#6B7C6F" }}>カテゴリ</p>
+          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">カテゴリ</p>
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setCategory(cat === category ? null : cat)}
-                className="px-3 py-1.5 rounded-full text-sm"
+                className="px-3 py-1.5 rounded-full text-sm transition-colors"
                 style={category === cat
-                  ? { backgroundColor: "#4A7C59", color: "#fff" }
-                  : { backgroundColor: "#fff", color: "#4A7C59", border: "1px solid #C8D4C9" }}
+                  ? { backgroundColor: "#557C79", color: "#fff" }
+                  : { backgroundColor: "#fff", color: "#557C79", border: "1px solid #D2D4BC" }}
               >
                 {cat}
               </button>
@@ -136,16 +133,15 @@ export default function ScanConfirmPage() {
         </div>
 
         {/* 期限の有無 */}
-        <div className="rounded-2xl px-4 py-3 flex items-center justify-between bg-white"
-          style={{ border: "1px solid #C8D4C9" }}>
-          <p className="text-sm" style={{ color: "#1F2D24" }}>
+        <div className="rounded-2xl px-4 py-3 flex items-center justify-between bg-white border border-[#D2D4BC]">
+          <p className="text-sm text-[#1F2D24]">
             {hasDeadline ? "期限あり" : "期限なし"}
           </p>
           <button
             type="button"
             onClick={() => setHasDeadline((v) => !v)}
             className="w-11 h-6 rounded-full transition-colors relative"
-            style={{ backgroundColor: hasDeadline ? "#4A7C59" : "#C8D4C9" }}
+            style={{ backgroundColor: hasDeadline ? "#557C79" : "#D2D4BC" }}
           >
             <span
               className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform"
@@ -157,13 +153,12 @@ export default function ScanConfirmPage() {
         {/* 提出期限 */}
         {hasDeadline && (
           <div>
-            <p className="text-xs font-medium mb-1.5" style={{ color: "#6B7C6F" }}>提出期限</p>
+            <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">提出期限</p>
             <input
               type="date"
               value={deadlineDate}
               onChange={(e) => setDeadlineDate(e.target.value)}
-              className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-              style={{ backgroundColor: "#fff", border: "1px solid #C8D4C9", color: "#1F2D24" }}
+              className="w-full rounded-2xl px-4 py-3 text-sm outline-none bg-white border border-[#D2D4BC] text-[#1F2D24]"
             />
           </div>
         )}
@@ -173,13 +168,13 @@ export default function ScanConfirmPage() {
           type="button"
           onClick={handleSubmit}
           disabled={!title.trim() || isSubmitting}
-          className="w-full rounded-2xl py-4 text-sm font-medium text-white"
-          style={{ backgroundColor: !title.trim() ? "#C8D4C9" : "#4A7C59" }}
+          className="w-full rounded-2xl py-4 text-sm font-medium text-white transition-colors"
+          style={{ backgroundColor: !title.trim() ? "#D2D4BC" : "#557C79" }}
         >
           {isSubmitting ? "登録中..." : isAnalyzed ? "✓ この内容で登録する" : "✓ 手入力で登録する"}
         </button>
 
-        <p className="text-xs text-center" style={{ color: "#9BA89D" }}>
+        <p className="text-xs text-center text-[#8fa09e]">
           登録後も詳細画面から再修正できます
         </p>
       </div>

@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppHeader } from "@/components/layout/AppHeader";
 
 export default function ScanPage() {
   const router = useRouter();
@@ -23,11 +22,9 @@ export default function ScanPage() {
       if (!res.ok) throw new Error("scan failed");
 
       const data = await res.json();
-      // 結果をsessionStorageに持たせてUI-004へ遷移
       sessionStorage.setItem("scanResult", JSON.stringify(data));
       router.push("/scan-confirm");
     } catch (e) {
-      // 解析失敗時も空欄でUI-004へ
       sessionStorage.setItem("scanResult", JSON.stringify({
         image_url: null,
         ai_analysis: null,
@@ -72,11 +69,10 @@ export default function ScanPage() {
         <h1 className="text-white text-base font-medium">書類をスキャン</h1>
       </div>
 
-      {/* カメラプレビューエリア（モック） */}
+      {/* カメラプレビューエリア */}
       <div className="flex-1 flex items-center justify-center mx-4 rounded-2xl overflow-hidden"
         style={{ backgroundColor: "#2a2a2a", minHeight: "50vh" }}>
         <div className="text-center">
-          {/* 四隅のコーナーマーカー */}
           <div className="relative w-48 h-64 mx-auto">
             <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white rounded-tl"/>
             <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr"/>
@@ -115,7 +111,6 @@ export default function ScanPage() {
           <div className="w-14 h-14 rounded-full bg-white"/>
         </button>
 
-        {/* スペーサー */}
         <div className="w-14 h-14"/>
       </div>
 
@@ -123,7 +118,6 @@ export default function ScanPage() {
         ライブラリから書類を選択できます
       </p>
 
-      {/* ファイル選択（非表示） */}
       <input
         ref={fileInputRef}
         type="file"

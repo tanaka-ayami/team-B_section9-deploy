@@ -28,8 +28,7 @@ export function FAB({
       type="button"
       onClick={handleClick}
       aria-label={ariaLabel}
-      className="fixed bottom-28 right-4 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center"
-      style={{ backgroundColor: "#4A7C59" }}
+      className="fixed bottom-28 right-4 z-50 w-14 h-14 rounded-full flex items-center justify-center bg-[#D45D1E] active:scale-95 transition-transform"
     >
       <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round"
