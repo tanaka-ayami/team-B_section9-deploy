@@ -141,3 +141,17 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+
+# Next.js auto-generated
+next-env.d.ts
+
+# Celery Beat schedule file
+celerybeat-schedule
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
