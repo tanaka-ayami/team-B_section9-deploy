@@ -1,7 +1,7 @@
 import { type ButtonHTMLAttributes } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "ghost" | "danger";
+  variant?: "primary" | "accent" | "ghost" | "danger";
   loading?: boolean;
 }
 
@@ -14,8 +14,9 @@ export function Button({
   ...props
 }: ButtonProps) {
   const variantStyles = {
-    primary: { background: "#4A7C59", color: "#fff" },
-    ghost:   { background: "#EEF1EC", color: "#6B7C6F" },
+    primary: { background: "#557C79", color: "#fff" },
+    accent:  { background: "#D45D1E", color: "#fff" },
+    ghost:   { background: "#D2D4BC", color: "#3a4a48" },
     danger:  { background: "#FCEBEB", color: "#E24B4A" },
   };
 
