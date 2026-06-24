@@ -26,7 +26,9 @@ class Settings(BaseSettings):
         )
 
     # Firebase Admin SDK
-    # サービスアカウントJSONをファイルとして渡す場合のパス
+    # 推奨：サービスアカウントJSONの内容をそのまま1行で.envに入れる
+    FIREBASE_CREDENTIALS_JSON: str = ""
+    # 代替：ファイルとして配置する場合のパス（JSONが未設定の場合のみ使用）
     FIREBASE_CREDENTIALS_PATH: str = "./firebase-service-account.json"
 
 
