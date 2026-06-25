@@ -13,3 +13,16 @@ def get_group_member_user_ids(db: Session, group_id) -> list:
         .all()
     )
     return [m.user_id for m in members]
+
+
+def is_group_member(db: Session, group_id, user_id) -> bool:
+    """
+    指定したユーザーが、指定したグループに所属しているかを確認する。
+    """
+    member = (
+        db.query(GroupMember)
+        .filter(GroupMember.group_id == group_id, GroupMember.user_id == user_id)
+        .first()
+    )
+    return member is not None
+    
