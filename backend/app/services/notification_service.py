@@ -46,3 +46,16 @@ def create_reminder_schedules(db: Session, group_id, document_id, deadline_date)
             status="pending",
         )
         db.add(schedule)
+
+
+def cancel_pending_reminders(db: Session, document_id):
+    """
+    指定した書類に紐づく、まだ送信していないリマインド予約（status='pending'）を
+    すべて 'cancelled' に更新する。
+
+    済スタンプON時・書類削除時に呼ばれる想定。
+    """
+    db.query(NotificationSchedule).filter(
+        NotificationSchedule.document_id == document_id,
+        NotificationSchedule.status == "pending",
+    ).update({"status": "cancelled"})

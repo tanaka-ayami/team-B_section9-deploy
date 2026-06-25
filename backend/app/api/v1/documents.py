@@ -18,6 +18,7 @@ from app.services.group_service import is_group_member
 from app.services.notification_service import (
     create_document_notifications,
     create_reminder_schedules,
+    cancel_pending_reminders,
 )
 
 router = APIRouter()
@@ -181,6 +182,7 @@ def update_document(
 ):
     """
     書類の内容を編集する。済スタンプ（is_done）のON/OFFもここで行う。
+    is_done が true に変更された場合、未送信のリマインド予約をキャンセルする。
     """
     document = _get_document_or_404(db, document_id)
 
@@ -190,6 +192,10 @@ def update_document(
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(document, key, value)
+
+    # 済スタンプがONになった場合、未送信のリマインド予約をキャンセルする
+    if update_data.get("is_done") is True:
+        cancel_pending_reminders(db, document_id)
 
     db.commit()
 
@@ -203,13 +209,14 @@ def delete_document(
     current_user=Depends(get_current_db_user),
 ):
     """
-    書類を削除する。
+    書類を削除する。削除に伴い、未送信のリマインド予約もキャンセルする。
     """
     document = _get_document_or_404(db, document_id)
 
     if not is_group_member(db, document.group_id, current_user.id):
         raise HTTPException(status_code=403, detail="このグループのメンバーではありません")
 
+    cancel_pending_reminders(db, document_id)
     db.delete(document)
     db.commit()
     
