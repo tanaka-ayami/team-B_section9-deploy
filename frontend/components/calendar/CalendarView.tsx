@@ -1,6 +1,8 @@
+// frontend/components/calendar/CalendarView.tsx
 "use client";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
+import dayjs from "dayjs";
 
 interface CalendarEvent {
   id: string;
@@ -18,17 +20,27 @@ export function CalendarView({
   events = [],
   onMonthChange,
 }: CalendarViewProps) {
-  const fcEvents = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    date: e.date,
-    classNames: e.isDone ? ["fc-event-done"] : ["fc-event-active"],
-  }));
+  const fcEvents = events.map((e) => {
+    const diff = dayjs(e.date).diff(dayjs().startOf("day"), "day");
+    const isToday = !e.isDone && diff === 0;
+    const isUrgent = !e.isDone && diff > 0 && diff <= 3;
+    return {
+      id: e.id,
+      title: e.title,
+      date: e.date,
+      classNames: e.isDone
+        ? ["fc-event-done"]
+        : isToday
+          ? ["fc-event-today"]
+          : isUrgent
+            ? ["fc-event-urgent"]
+            : ["fc-event-normal"],
+    };
+  });
 
   return (
     <div className="px-3 pt-2 pb-3">
       <style>{`
-        /* ─── ベースリセット ─── */
         .fc table,
         .fc th,
         .fc td,
@@ -38,16 +50,12 @@ export function CalendarView({
           border: none !important;
           background: transparent !important;
         }
-
-        /* ─── 週行ごとにうっすい下線 ─── */
         .fc .fc-daygrid-body tr {
           border-bottom: 0.5px solid rgba(0,0,0,0.06) !important;
         }
         .fc .fc-daygrid-body tr:last-child {
           border-bottom: none !important;
         }
-
-        /* ─── ヘッダーナビ ─── */
         .fc .fc-toolbar { margin-bottom: 8px; }
         .fc .fc-toolbar-title { font-size: 0.95rem; font-weight: 500; color: #333; }
         .fc .fc-button {
@@ -59,8 +67,6 @@ export function CalendarView({
           box-shadow: none !important;
         }
         .fc .fc-button:focus { box-shadow: none !important; }
-
-        /* ─── 曜日ヘッダー ─── */
         .fc .fc-col-header-cell-cushion {
           font-size: 0.7rem;
           font-weight: 500;
@@ -70,8 +76,6 @@ export function CalendarView({
         }
         .fc .fc-col-header-cell:first-child .fc-col-header-cell-cushion { color: #e05252; }
         .fc .fc-col-header-cell:last-child  .fc-col-header-cell-cushion { color: #4472c4; }
-
-        /* ─── 日付数字（数字のみ表示） ─── */
         .fc .fc-daygrid-day-top { justify-content: center; }
         .fc .fc-daygrid-day-number {
           font-size: 0.75rem;
@@ -85,26 +89,17 @@ export function CalendarView({
           border-radius: 50%;
           margin: 3px auto 1px;
         }
-        /* "日"の文字を消して数字だけにする */
         .fc .fc-daygrid-day-number::after { content: none !important; }
         .fc-direction-ltr .fc-daygrid-day-number { float: none; }
-
-        /* ─── 日曜・土曜 ─── */
         .fc .fc-day-sun .fc-daygrid-day-number { color: #e05252; }
         .fc .fc-day-sat .fc-daygrid-day-number { color: #4472c4; }
-
-        /* ─── 当月外 ─── */
         .fc .fc-day-other .fc-daygrid-day-number { color: #ccc; }
         .fc .fc-day-other { opacity: 1; }
-
-        /* ─── 今日 ─── */
         .fc .fc-day-today { background: transparent !important; }
         .fc .fc-day-today .fc-daygrid-day-number {
           background-color: #557C79 !important;
           color: #fff !important;
         }
-
-        /* ─── イベント（タイトルあり・小さいpill） ─── */
         .fc .fc-daygrid-day-events { margin-top: 1px; padding: 0 2px 2px; }
         .fc .fc-event {
           border: none !important;
@@ -113,15 +108,16 @@ export function CalendarView({
           margin: 1px 1px !important;
           font-size: 0.6rem !important;
           line-height: 1.4 !important;
-          background-color: #557C79 !important;
-          color: #fff !important;
-        }
-        .fc .fc-event-active { background-color: #D45D1E !important; color: #fff !important; }
-        .fc .fc-event-done   { background-color: #ADCFBA !important; color: #2d5a4e !important; }
-        .fc .fc-event-title  { font-size: 0.6rem !important; }
+          color: inherit !important;
+}
+        .fc .fc-event-title  { font-size: 0.6rem !important; color: inherit !important; }
         .fc .fc-daygrid-event-dot { display: none !important; }
-      `}</style>
-      <FullCalendar
+        .fc .fc-event.fc-event-today  { background-color: #D45D1E !important; color: #fff !important; font-weight: 600 !important; }
+        .fc .fc-event.fc-event-urgent { background-color: #FADDCC !important; color: #B84A18 !important; font-weight: 600 !important; }
+        .fc .fc-event.fc-event-normal { background-color: #9BBFAA !important; color: #1e4d3a !important; }
+        .fc .fc-event.fc-event-done   { background-color: #C0C0C0 !important; color: #555 !important; }
+        `}</style>  
+        <FullCalendar
         plugins={[dayGridPlugin]}
         initialView="dayGridMonth"
         locale="ja"

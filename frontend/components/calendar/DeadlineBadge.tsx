@@ -1,3 +1,4 @@
+// frontend/components/calendar/DeadlineBadge.tsx
 import dayjs from "dayjs";
 
 interface DeadlineBadgeProps {
@@ -15,11 +16,14 @@ function getVariant(deadlineDate: string, isDone: boolean): BadgeVariant {
   return "normal";
 }
 
-const STYLES: Record<BadgeVariant, { label: (diff: number) => string; style: React.CSSProperties }> = {
-  today:  { label: () => "今日！",       style: { backgroundColor: "#E24B4A", color: "#fff", fontWeight: 600 } },
-  urgent: { label: (d) => `あと ${d} 日`, style: { backgroundColor: "#FEF3CD", color: "#92650A" } },
-  normal: { label: (d) => `あと ${d} 日`, style: { backgroundColor: "#EEF1EC", color: "#4A7C59" } },
-  done:   { label: () => "✅ 済",         style: { backgroundColor: "#E5E7EB", color: "#6B7280" } },
+const STYLES: Record <
+  BadgeVariant,
+  { label: (diff: number) => string; style: React.CSSProperties }
+> = {
+  today:  { label: () => "今日！",       style: { backgroundColor: "#D45D1E", color: "#fff",     fontWeight: 600 } },
+  urgent: { label: (d) => `あと${d}日`, style: { backgroundColor: "#FADDCC", color: "#D45D1E"} },
+  normal: { label: (d) => `あと${d}日`, style: { backgroundColor: "#ADCFBA", color: "#2d5a4e" } },
+  done:   { label: () => "✓ 済",         style: { backgroundColor: "#e8e8e8", color: "#aaa",     textDecoration: "line-through" } },
 };
 
 export function DeadlineBadge({ deadlineDate, isDone }: DeadlineBadgeProps) {
