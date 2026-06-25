@@ -10,7 +10,7 @@ from app.db.seed import seed_default_categories
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 起動時：共通カテゴリ（学校・医療・行政・保険・その他）をシーディング（issue #12 MVP外対応）
+    # 起動時：共通カテゴリ（学校・医療・行政・保険・その他）をシーディング（Issue #12 MVP対応）
     db = SessionLocal()
     try:
         seed_default_categories(db)

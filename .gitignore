@@ -119,6 +119,10 @@ dist
 # Firebase cache directory
 .firebase/
 
+# Firebase
+firebase-service-account.json
+*.firebase-credentials.json
+
 # TernJS port file
 .tern-port
 
@@ -155,3 +159,4 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+
