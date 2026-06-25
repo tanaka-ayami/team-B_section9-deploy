@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db.base import get_db
 from app.models.document import Document
+from app.models.notification import Category
 from app.api.v1.notifications import get_current_db_user
 from app.services.cloudinary_service import upload_document_image
 from app.services.openai_service import analyze_document_image
@@ -61,12 +62,19 @@ class DocumentUpdate(BaseModel):
     is_done: bool | None = None
 
 
-def _document_to_dict(d: Document) -> dict:
+def _document_to_dict(d: Document, db: Session) -> dict:
     """Documentモデルをレスポンス用の辞書に変換する（共通処理）。"""
+    category_name = None
+    if d.category_id:
+        category = db.query(Category).filter(Category.id == d.category_id).first()
+        if category:
+            category_name = category.name
+
     return {
         "id": str(d.id),
         "group_id": str(d.group_id),
         "category_id": str(d.category_id) if d.category_id else None,
+        "categoryName": category_name,
         "title": d.title,
         "image_url": d.image_url,
         "has_deadline": d.has_deadline,
@@ -127,7 +135,7 @@ def create_document(
 
     db.commit()
 
-    return _document_to_dict(document)
+    return _document_to_dict(document, db)
 
 
 @router.get("/v1/groups/{group_id}/documents")
@@ -144,7 +152,7 @@ def list_documents(
 
     documents = db.query(Document).filter(Document.group_id == group_id).all()
 
-    return {"documents": [_document_to_dict(d) for d in documents]}
+    return {"documents": [_document_to_dict(d, db) for d in documents]}
 
 
 @router.get("/v1/documents/{document_id}")
@@ -161,7 +169,7 @@ def get_document(
     if not is_group_member(db, document.group_id, current_user.id):
         raise HTTPException(status_code=403, detail="このグループのメンバーではありません")
 
-    return _document_to_dict(document)
+    return _document_to_dict(document, db)
 
 
 @router.patch("/v1/documents/{document_id}")
@@ -179,14 +187,13 @@ def update_document(
     if not is_group_member(db, document.group_id, current_user.id):
         raise HTTPException(status_code=403, detail="このグループのメンバーではありません")
 
-    # 送られてきた項目だけを更新する（Noneのままの項目は変更しない）
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(document, key, value)
 
     db.commit()
 
-    return _document_to_dict(document)
+    return _document_to_dict(document, db)
 
 
 @router.delete("/v1/documents/{document_id}", status_code=204)
