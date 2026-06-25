@@ -17,7 +17,7 @@ def test_health():
 
 
 def test_users_me_without_token_is_401():
-    res = client.get("/api/v1/users/me")
+    res = client.get("/v1/users/me")
     assert res.status_code == 401
 
 
@@ -27,7 +27,7 @@ def test_users_me_with_mocked_token():
         "email": "test@example.com",
         "email_verified": True,
     }
-    res = client.get("/api/v1/users/me")
+    res = client.get("/v1/users/me")
     assert res.status_code == 200
     assert res.json()["firebase_uid"] == "test-uid-123"
     app.dependency_overrides.clear()
