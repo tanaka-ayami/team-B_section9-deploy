@@ -91,7 +91,7 @@ Content-Type: application/json
 ```
 
 ```json
-// Request Body（空オブジェクト）
+// Request Body
 {
   "display_name": "山田太郎"
 }
