@@ -1,6 +1,7 @@
-# API設計書（v2.0）
+# API設計書（v2.1）
 
 データベース設計書（v1.1）および要件定義書（v7.2）との整合性を取って再設計したAPI設計書。
+データベース設計書（v1.1）および要件定義書（v7.3）との整合性を取って再設計したAPI設計書。
 
 OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイルは `backend/openapi.yaml` で管理し、本ドキュメントは概要、エンドポイント一覧、および運用ルールを示す。
 
@@ -14,7 +15,7 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
   - バックエンドはFirebase Admin SDKを用いてトークンを検証し、`users.firebase_uid` からユーザーを特定する（FR-001）。
 - **バージョニング**：URL埋め込み（`/v1/...`）
 - **識別子のデータ型**：DB設計書との整合性を担保するため、すべてのリソースID（`user_id`, `group_id`, `document_id`, `category_id` 等）には **UUID形式の文字列** を採用する。
-- **権限モデル**：グループ内メンバーは一律同等権限（書類の登録・編集・削除が可能）。**グループ自体の削除のみ `groups.created_by` のユーザーに制限**する（要件定義書 4章・FR-002）。
+- **権限モデル**：グループ内メンバーは一律同等権限（書類の登録・編集・削除が可能）。**グループ自体の削除のみ `groups.created_by` のユーザーに制限**する（要件定義書 4章・FR-002）※カテゴリ（categories）の追加・編集・削除は例外として、当該グループのcreated_by（管理者）のみに制限する。
 - **エラーレスポンスの共通フォーマット**：すべてのエラー（4xx, 5xx）は一意のエラーコードを含むJSON形式で統一する。
 
 ---
@@ -47,9 +48,9 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
 | メソッド | パス | 概要 | 認証 | 備考 |
 |---|---|---|---|---|
 | GET | `/v1/categories` | カテゴリ一覧取得 | 必要 | 共通カテゴリ（`group_id IS NULL`）＋所属グループ固有カテゴリ（FR-010）。 |
-| POST | `/v1/categories` | グループ固有カテゴリの作成 | 必要 | `group_id` を必須とし、共通カテゴリは作成不可。 |
-| PATCH | `/v1/categories/{id}` | カテゴリ編集 | 必要 | グループ固有カテゴリのみ編集可能。共通カテゴリは `FORBIDDEN_GROUP_ACTION`。 |
-| DELETE | `/v1/categories/{id}` | カテゴリ削除 | 必要 | グループ固有カテゴリのみ削除可能。 |
+| POST | `/v1/categories` | グループ固有カテゴリの作成 | 必要 | group_id を必須とし、共通カテゴリは作成不可。当該グループの管理者（created_by）のみ作成可能（一般メンバーは403 FORBIDDEN_GROUP_ACTION）。 |
+| PATCH | `/v1/categories/{id}` | カテゴリ編集 | 必要 | グループの管理者（created_by）のみ編集可能（一般メンバーは403 FORBIDDEN_GROUP_ACTION）。共通カテゴリ（group_id IS NULL）も、操作対象グループを明示するクエリパラメータ ?group_id={group_id}（必須） を付与し、そのグループの管理者であれば編集可能。 |
+| DELETE | `/v1/categories/{id}` | カテゴリ削除 | 必要 | グループの管理者（created_by）のみ削除可能。共通カテゴリも、クエリパラメータ ?group_id={group_id}（必須） で指定したグループの管理者であれば削除可能。 |
 
 ### 書類
 
@@ -292,6 +293,7 @@ Authorization: Bearer <Firebase_ID_Token>
 | 401 Unauthorized | `UNAUTHORIZED` | Firebase IDトークンが無効、期限切れ、または未設定。 |
 | 403 Forbidden | `FORBIDDEN_GROUP_ACTION` | 作成者（`created_by`）以外によるグループ削除操作、または共通カテゴリの編集・削除操作。 |
 | 404 Not Found | `RESOURCE_NOT_FOUND` | 指定された書類（`document_id`）、グループ、カテゴリ等が存在しない。 |
+| 409 | `GROUP_DELETE_CONFLICT` | グループに紐づく書類・カテゴリが存在し削除できない。 |
 | 410 Gone | `INVITATION_EXPIRED` | `invitations.expires_at` を過ぎた招待トークンへのアクセス。 |
 | 422 Unprocessable | `SCAN_LIMIT_EXCEEDED` | 当月の無料スキャン上限（`monthly_scan_count`）を超過（Stripeへの導線トリガー）。 |
 | 500 Internal Error | `OPENAI_API_FAILED` | OpenAI APIのエラーが指数バックオフ（最大3回リトライ）後も解消しなかった場合。 |
