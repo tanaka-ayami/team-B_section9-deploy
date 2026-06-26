@@ -63,10 +63,16 @@ def get_current_user(
     """
     Firebaseで検証済みのuidから、DB上のUser行を取得する（issue #16で追加）。
     未登録（初回ログイン）の場合はその場で作成する（upsert）。
+    display_nameはNOT NULLのため、メールの@より前をフォールバックとして使用する。
     """
     user = db.query(User).filter(User.firebase_uid == firebase_user["uid"]).first()
     if user is None:
-        user = User(firebase_uid=firebase_user["uid"], email=firebase_user["email"] or "")
+        email = firebase_user["email"] or ""
+        user = User(
+            firebase_uid=firebase_user["uid"],
+            email=email,
+            display_name=email.split("@")[0] if email else "ユーザー",
+        )
         db.add(user)
         db.commit()
         db.refresh(user)
