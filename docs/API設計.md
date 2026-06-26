@@ -92,7 +92,9 @@ Content-Type: application/json
 
 ```json
 // Request Body（空オブジェクト）
-{}
+{
+  "display_name": "山田太郎"
+}
 ```
 
 ```json
@@ -107,7 +109,7 @@ Content-Type: application/json
   },
   "personal_group": {
     "id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
-    "name": "user@example.com のマイグループ"
+    "name": "山田太郎"
   }
 }
 ```
