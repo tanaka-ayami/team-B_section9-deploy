@@ -21,6 +21,7 @@ class User(Base):
     )
     firebase_uid: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(50), nullable=False)
     plan_status: Mapped[str] = mapped_column(String(50), default="free")
     monthly_scan_count: Mapped[int] = mapped_column(Integer, default=0)
     remind_days_before: Mapped[int] = mapped_column(Integer, default=3)
