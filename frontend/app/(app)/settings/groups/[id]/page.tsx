@@ -35,20 +35,6 @@ const MOCK_GROUPS: Record<string, {
   },
 };
 
-const MOCK_CATEGORIES = [
-  { id: "cat-01", name: "学校", icon: "🎓" },
-  { id: "cat-02", name: "医療", icon: "🏥" },
-  { id: "cat-03", name: "行政", icon: "🏛️" },
-  { id: "cat-04", name: "保険", icon: "🛡️" },
-  { id: "cat-05", name: "税金", icon: "🧾" },
-  { id: "cat-06", name: "住居・暮らし", icon: "🏠" },
-  { id: "cat-07", name: "子育て", icon: "👶" },
-  { id: "cat-08", name: "介護", icon: "🧑‍🦽" },
-  { id: "cat-09", name: "仕事", icon: "💼" },
-  { id: "cat-10", name: "趣味", icon: "🎨" },
-  { id: "cat-11", name: "その他", icon: "📄" },
-];
-
 // 自分のユーザーID（Week2でFirebase Auth から取得）
 const CURRENT_USER_ID = "user-001";
 
@@ -228,22 +214,6 @@ export default function GroupDetailPage() {
           <p className="text-xs text-[#557C79] leading-relaxed">
             グループ内の全メンバーが書類の登録・編集・削除を行えます。グループの削除は作成者のみ可能です。
           </p>
-        </div>
-
-        {/* カテゴリ一覧（読み取り専用・固定11種類） */}
-        <div>
-          <p className="text-xs text-[#8fa09e] mb-2 px-1">カテゴリ（固定）</p>
-          <div className="bg-white rounded-2xl overflow-hidden">
-            {MOCK_CATEGORIES.map((cat, index) => (
-              <div key={cat.id}>
-                {index > 0 && <div className="h-px bg-[#f2f1ec] mx-4" />}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-lg">{cat.icon}</span>
-                  <p className="text-sm text-[#1F2D24]">{cat.name}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* グループ操作 */}
