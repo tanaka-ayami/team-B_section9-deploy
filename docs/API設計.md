@@ -83,6 +83,7 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
 ### ① 新規ユーザー登録＆初期化 `POST /v1/auth/signup`
 
 Firebase Authのサインアップ完了直後にコールする。`users` レコード作成、個人グループの自動生成を一括で行う。
+既に登録済みのユーザーが呼んだ場合は、新規作成せず既存のユーザー・グループ情報をそのまま返す（冪等）。
 
 ```http
 POST /v1/auth/signup
@@ -103,6 +104,7 @@ Content-Type: application/json
   "user": {
     "id": "4a7b9c3d-e2f1-4b5a-8c9d-0e1f2a3b4c5d",
     "email": "user@example.com",
+    "display_name": "山田太郎",
     "plan_status": "free",
     "monthly_scan_count": 0,
     "remind_days_before": 3
