@@ -10,8 +10,11 @@ from typing import TypedDict
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth as firebase_auth
+from sqlalchemy.orm import Session
 
 from app.core.firebase import init_firebase
+from app.db.base import get_db
+from app.models.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -51,3 +54,26 @@ def get_current_firebase_user(
         email=decoded.get("email"),
         email_verified=decoded.get("email_verified", False),
     )
+
+
+def get_current_user(
+    firebase_user: FirebaseUser = Depends(get_current_firebase_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    Firebaseで検証済みのuidから、DB上のUser行を取得する（issue #16で追加）。
+    未登録（初回ログイン）の場合はその場で作成する（upsert）。
+    display_nameはNOT NULLのため、メールの@より前をフォールバックとして使用する。
+    """
+    user = db.query(User).filter(User.firebase_uid == firebase_user["uid"]).first()
+    if user is None:
+        email = firebase_user["email"] or ""
+        user = User(
+            firebase_uid=firebase_user["uid"],
+            email=email,
+            display_name=email.split("@")[0] if email else "ユーザー",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user

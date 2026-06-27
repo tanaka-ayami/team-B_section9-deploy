@@ -1,13 +1,45 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { NotificationDrawer } from "@/components/layout/NotificationDrawer";
+
+// モック通知データ（Week2でAPI差し替え）
+const MOCK_NOTIFICATIONS = [
+  {
+    id: "notif-001",
+    message: "花子が書類を登録しました",
+    documentTitle: "夏期講習 申込書",
+    isRead: false,
+    createdAt: "2026-06-27T10:00:00Z",
+  },
+  {
+    id: "notif-002",
+    message: "太郎が書類を登録しました",
+    documentTitle: "定期健康診断のご案内",
+    isRead: false,
+    createdAt: "2026-06-26T15:30:00Z",
+  },
+  {
+    id: "notif-003",
+    message: "花子が書類を登録しました",
+    documentTitle: "PTA会費 納入のお知らせ",
+    isRead: true,
+    createdAt: "2026-06-25T09:00:00Z",
+  },
+];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -26,10 +58,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const handleNotificationRead = (id: string) => {
+    // Week2でPATCH /v1/notifications/:id/read に差し替え
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-screen">
+      <AppHeader
+        groupName="山田ファミリー"
+        unreadCount={unreadCount}
+        onBellClick={() => setDrawerOpen(true)}
+      />
       <main className="flex-1 pb-24">{children}</main>
       <BottomNav />
+      <NotificationDrawer
+        open={drawerOpen}
+        notifications={notifications}
+        onClose={() => setDrawerOpen(false)}
+        onRead={handleNotificationRead}
+      />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { AppHeader } from "@/components/layout/AppHeader";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { DocumentCard } from "@/components/calendar/DocumentCard";
 import { FAB } from "@/components/layout/FAB";
@@ -57,11 +56,6 @@ export default function CalendarPage() {
 
   return (
     <div className="min-h-screen bg-[#f2f1ec]">
-      <AppHeader
-        groupName="山田ファミリー"
-        yearMonth={`${currentYear}年${currentMonth}月`}
-        unreadCount={2}
-      />
       <div className="px-4 pt-4">
         <div className="bg-white rounded-[18px] overflow-hidden">
           <CalendarView

@@ -28,7 +28,7 @@ class Category(Base):
     )
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     color_code: Mapped[str | None] = mapped_column(String(7), nullable=True)
-
+    icon: Mapped[str | None] = mapped_column(String(20), nullable=True)  # 絵文字を想定（issue #16後の追加変更）
 
 class AppNotification(Base):
     __tablename__ = "app_notifications"
