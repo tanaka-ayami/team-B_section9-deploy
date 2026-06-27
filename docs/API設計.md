@@ -91,7 +91,154 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
 
 ---
 
-## 3. スキーマ定義（v2.2での変更分）
+## 3. リクエスト / レスポンス例
+
+### ① 新規ユーザー登録＆初期化 `POST /v1/auth/signup`
+
+Firebase Authのサインアップ完了直後にコールする。`users` レコード作成、個人グループの自動生成を一括で行う。
+既に登録済みのユーザーが呼んだ場合は、新規作成せず既存のユーザー・グループ情報をそのまま返す（冪等）。
+
+```http
+POST /v1/auth/signup
+Authorization: Bearer <Firebase_ID_Token>
+Content-Type: application/json
+```
+
+```json
+// Request Body
+{
+  "display_name": "山田太郎"
+}
+```
+
+```json
+// Response Body (201 Created)
+{
+  "user": {
+    "id": "4a7b9c3d-e2f1-4b5a-8c9d-0e1f2a3b4c5d",
+    "email": "user@example.com",
+    "display_name": "山田太郎",
+    "plan_status": "free",
+    "monthly_scan_count": 0,
+    "remind_days_before": 3
+  },
+  "personal_group": {
+    "id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
+    "name": "山田太郎"
+  }
+}
+```
+
+### ② 書類画像のアップロード＆AI解析 `POST /v1/documents/scan`
+
+画像（バイナリ）を受け取り、Cloudinaryへ保存して署名付きURLを発行後、OpenAI APIで解析した結果を返す。「宛先」フィールドは解析対象外（要件定義書 FR-003）。
+
+```http
+POST /v1/documents/scan
+Authorization: Bearer <Firebase_ID_Token>
+Content-Type: multipart/form-data
+
+(file: binary data)
+```
+
+```json
+// Response Body (200 OK)
+{
+  "image_url": "https://res.cloudinary.com/example/image/authenticated/s--abc--/v1/document.jpg",
+  "ai_analysis": {
+    "title": "遠足のお知らせ",
+    "category": "学校",
+    "deadline": "2026-07-01",
+    "has_deadline": true
+  }
+}
+```
+
+> `category` はカテゴリ名の文字列で返る（付録のStructured Outputsスキーマに準拠）。フロントエンドは `GET /v1/categories` の結果と名称マッチングして `category_id`（UUID）を解決し、③の登録APIに渡す。
+
+### ③ 書類データの最終登録 `POST /v1/documents`
+
+解析確認画面でユーザーが修正・確定したデータをDBへ登録する。登録に伴い、グループ内全ユーザー（各自の `remind_days_before` に応じたスケジュール）への `notification_schedules`、および本人以外のメンバーへの `app_notifications` が自動生成される。
+
+```http
+POST /v1/documents
+Authorization: Bearer <Firebase_ID_Token>
+Content-Type: application/json
+```
+
+```json
+// Request Body
+{
+  "group_id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
+  "category_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+  "title": "遠足のお知らせ（修正済）",
+  "has_deadline": true,
+  "deadline_date": "2026-07-01",
+  "image_url": "https://res.cloudinary.com/example/image/authenticated/s--abc--/v1/document.jpg"
+}
+```
+
+```json
+// Response Body (201 Created)
+{
+  "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+  "group_id": "8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d",
+  "category_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+  "title": "遠足のお知らせ（修正済）",
+  "has_deadline": true,
+  "deadline_date": "2026-07-01",
+  "is_done": false,
+  "created_by": "4a7b9c3d-e2f1-4b5a-8c9d-0e1f2a3b4c5d",
+  "created_at": "2026-06-22T00:42:32Z"
+}
+```
+
+### ④ 済スタンプの切り替え `PATCH /v1/documents/{id}`
+
+詳細画面（UI-005）での「済スタンプ」トグル操作を反映する。`is_done: true` の場合、対象書類に関連するすべての送信予定リマインド（`notification_schedules` 内の `status: 'pending'`）を即座に `cancelled` へ更新する。
+
+```http
+PATCH /v1/documents/2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
+Authorization: Bearer <Firebase_ID_Token>
+Content-Type: application/json
+```
+
+```json
+// Request Body
+{
+  "is_done": true
+}
+```
+
+```json
+// Response Body (200 OK)
+{
+  "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+  "is_done": true,
+  "message": "済スタンプが適用されました。未送信のリマインドメールはキャンセルされました。"
+}
+```
+
+### ⑤ グループ招待の発行と承諾 `POST /v1/groups/{id}/invite` → `POST /v1/invitations/{token}/accept`
+
+招待発行時、`invitations` レコードを作成し、SendGridで招待リンク（`token` を含むURL）を送信する。
+
+```http
+POST /v1/groups/8f7e6d5c-4b3a-2a1f-0e9d-8c7b6a5b4c3d/invite
+Authorization: Bearer <Firebase_ID_Token>
+Content-Type: application/json
+```
+
+```json
+// Request Body
+{
+  "invitee_email": "family@example.com"
+}
+```
+
+---
+
+## 3.5. スキーマ定義（v2.2での変更分）
 
 ```jsonc
 // UserRead（GET /v1/users/me）
@@ -133,8 +280,24 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
 
 | コード | HTTPステータス | 説明 |
 |---|---|---|
-| `FORBIDDEN_GROUP_ACTION` | 403 | グループ管理者（`created_by`）以外による、管理者限定操作（グループ削除等）の試行 |
+| `UNAUTHORIZED` | 401 | Firebase IDトークンが無効、期限切れ、または未設定。 |
+| `FORBIDDEN_GROUP_ACTION` | 403 | 作成者（`created_by`）以外によるグループ削除操作、または共通カテゴリの編集・削除操作。グループ管理者限定操作の試行も含む。 |
 | `GROUP_DELETE_CONFLICT` | 409 | グループに紐づく `documents` 等が残っており削除できない |
-| `INVITATION_EXPIRED` | 410 | 招待の有効期限切れ |
+| `RESOURCE_NOT_FOUND` | 404 | 指定された書類（`document_id`）、グループ、カテゴリ、招待等が存在しない。 |
+| `INVITATION_EXPIRED` | 410 | `invitations.expires_at` を過ぎた招待トークンへのアクセス。 |
 | `INVITATION_ALREADY_HANDLED` | 409 | 既に承諾・拒否済みの招待への再操作 |
-| `RESOURCE_NOT_FOUND` | 404 | 指定したリソース（グループ・カテゴリ・招待等）が存在しない |
+| `SCAN_LIMIT_EXCEEDED` | 422 | 当月の無料スキャン上限（`monthly_scan_count`）を超過（Stripeへの導線トリガー）。 |
+| `OPENAI_API_FAILED` | 500 | OpenAI APIのエラーが指数バックオフ（最大3回リトライ）後も解消しなかった場合。 |
+
+---
+
+## 5. レート制限・冪等性
+
+### レート制限の方針
+- 一般的なAPIエンドポイント（GETなど）は、Redisを用いてユーザー（`firebase_uid`）あたり **1分間に最大120リクエスト** に制限する。
+- AI解析エンドポイント（`POST /v1/documents/scan`）は、OpenAI APIの負荷およびコスト管理の観点から、**1分間に最大5リクエスト** の厳格な制限を設ける。
+
+### POST / PATCH に対する冪等性の扱い
+- **書類登録（`POST /v1/documents`）**：モバイル通信の瞬断等による重複登録を防ぐため、フロントエンドは画面遷移時に生成した一意のUUIDをヘッダー `X-Idempotency-Key` に付与して送信することを推奨とする。バックエンドは同一キーによる2重リクエストを検知した場合、初回と同じレスポンス（201）を即座に返却する。
+- **済スタンプ等のPATCHリクエスト**：状態の「上書き」であるため冪等キーは不要（何度リクエストしても最終的な状態は変わらないため）。
+- **Stripe Webhook（`POST /v1/billing/webhook`）**：Stripeが送信する `event.id` を用いて重複イベント処理を防止する（同一イベントの再送に対して二重課金処理が起きないようにする）。
