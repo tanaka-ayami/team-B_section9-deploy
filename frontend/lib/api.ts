@@ -55,3 +55,153 @@ export const apiClient = {
   delete:   <T>(path: string)                 => request<T>("DELETE", path),
   postForm: <T>(path: string, form: FormData) => requestForm<T>(path, form),
 };
+
+// ===== 型定義 =====
+
+export interface Document {
+  id: string;
+  group_id: string;
+  category_id: string | null;
+  title: string | null;
+  image_url: string;
+  has_deadline: boolean;
+  deadline_date: string | null;
+  is_done: boolean;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AppNotification {
+  id: string;
+  group_id: string;
+  triggered_by: string;
+  document_id: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface Category {
+  id: string;
+  group_id: string | null;
+  name: string;
+  color_code: string | null;
+  icon: string | null;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  created_by: string;
+}
+
+export interface GroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  email: string;
+  display_name: string;
+  joined_at: string;
+}
+
+export interface Invitation {
+  id: string;
+  group_id: string;
+  invited_by: string;
+  invitee_email: string;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+  expires_at: string;
+}
+
+export interface UserMe {
+  id: string;
+  firebase_uid: string;
+  email: string;
+  display_name: string;
+  plan_status: string;
+  monthly_scan_count: number;
+  remind_days_before: number;
+}
+
+// ===== ユーザー =====
+
+export const userApi = {
+  // GET /v1/users/me
+  getMe: () =>
+    apiClient.get<UserMe>("/v1/users/me"),
+  // PATCH /v1/users/me
+  updateMe: (body: Partial<Pick<UserMe, "display_name" | "remind_days_before">>) =>
+    apiClient.patch<UserMe>("/v1/users/me", body),
+};
+
+// ===== 書類 =====
+
+export const documentApi = {
+  // GET /v1/documents?group_id=xxx
+  list: (groupId: string, params?: { category_id?: string; has_deadline?: boolean; year?: number; month?: number }) => {
+    const query = new URLSearchParams({ group_id: groupId });
+    if (params?.category_id) query.set("category_id", params.category_id);
+    if (params?.has_deadline !== undefined) query.set("has_deadline", String(params.has_deadline));
+    if (params?.year) query.set("year", String(params.year));
+    if (params?.month) query.set("month", String(params.month));
+    return apiClient.get<Document[]>("/v1/documents?" + query.toString());
+  },
+  // GET /v1/documents/:id
+  get: (id: string) =>
+    apiClient.get<Document>("/v1/documents/" + id),
+  // POST /v1/documents
+  create: (body: Omit<Document, "id" | "created_at">) =>
+    apiClient.post<Document>("/v1/documents", body),
+  // PATCH /v1/documents/:id
+  update: (id: string, body: Partial<Document>) =>
+    apiClient.patch<Document>("/v1/documents/" + id, body),
+  // DELETE /v1/documents/:id
+  delete: (id: string) =>
+    apiClient.delete<void>("/v1/documents/" + id),
+  // POST /v1/documents/scan
+  scan: (formData: FormData) =>
+    apiClient.postForm<{ title: string; category: string | null; deadline: string | null; has_deadline: boolean; image_url: string }>("/v1/documents/scan", formData),
+};
+
+// ===== 通知 =====
+
+export const notificationApi = {
+  // GET /v1/notifications
+  list: () =>
+    apiClient.get<AppNotification[]>("/v1/notifications"),
+  // PATCH /v1/notifications/:id/read
+  markRead: (id: string) =>
+    apiClient.patch<void>("/v1/notifications/" + id + "/read"),
+};
+
+// ===== カテゴリ =====
+
+export const categoryApi = {
+  // GET /v1/categories
+  list: () =>
+    apiClient.get<Category[]>("/v1/categories"),
+};
+
+// ===== グループ =====
+
+export const groupApi = {
+  // GET /v1/groups
+  list: () =>
+    apiClient.get<Group[]>("/v1/groups"),
+  // POST /v1/groups
+  create: (name: string) =>
+    apiClient.post<Group>("/v1/groups", { name }),
+  // DELETE /v1/groups/:id
+  delete: (id: string) =>
+    apiClient.delete<void>("/v1/groups/" + id),
+  // PATCH /v1/groups/:id
+  update: (id: string, name: string) =>
+    apiClient.patch<Group>("/v1/groups/" + id, { name }),
+  // GET /v1/groups/:id/members
+  getMembers: (id: string) =>
+    apiClient.get<GroupMember[]>("/v1/groups/" + id + "/members"),
+  // POST /v1/groups/:id/invite
+  invite: (id: string, email: string) =>
+    apiClient.post<Invitation>("/v1/groups/" + id + "/invite", { email }),
+};
