@@ -210,7 +210,7 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl overflow-hidden">
             <button
               type="button"
-              onClick={() => {}}
+              onClick={() => router.push("/settings/profile")}
               className="w-full flex items-center gap-3 px-4 py-4 hover:bg-[#f2f1ec] transition-colors"
             >
               <svg className="w-5 h-5 text-[#557C79]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
