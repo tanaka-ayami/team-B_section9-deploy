@@ -14,10 +14,12 @@ from app.main import app
 from app.models.user import User
 
 
-def _get_or_create_user(db, firebase_uid: str, email: str) -> User:
+def _get_or_create_user(
+    db, firebase_uid: str, email: str, display_name: str = "テストユーザー"
+) -> User:
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if user is None:
-        user = User(firebase_uid=firebase_uid, email=email)
+        user = User(firebase_uid=firebase_uid, email=email, display_name=display_name)
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -36,7 +38,7 @@ def db_session():
 @pytest.fixture
 def user_a(db_session):
     """グループ作成者（管理者）役のテストユーザー。"""
-    return _get_or_create_user(db_session, "test-uid-admin", "admin@example.com")
+    return _get_or_create_user(db_session, "test-uid-admin", "admin@example.com", "管理者")
 
 
 @pytest.fixture
