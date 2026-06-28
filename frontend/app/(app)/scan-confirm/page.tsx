@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { categoryApi, groupApi, documentApi, Category, Group } from "@/lib/api";
 
 interface AiAnalysis {
   title: string | null;
@@ -15,19 +16,28 @@ interface ScanResult {
   ai_analysis: AiAnalysis | null;
 }
 
-const CATEGORIES = ["学校", "医療", "行政", "保険", "その他"];
-
 export default function ScanConfirmPage() {
   const router = useRouter();
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
+
+  // カテゴリ：名前文字列ではなくidで管理（APIから取得した11種類）
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [aiCategoryName, setAiCategoryName] = useState<string | null>(null);
+
+  // 登録先グループ（自分が所属するグループから選択。デフォルトは最初の1件）
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupId, setGroupId] = useState<string | null>(null);
+
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isAnalyzed = scanResult?.ai_analysis !== null;
 
+  // スキャン結果の読み込み
   useEffect(() => {
     const raw = sessionStorage.getItem("scanResult");
     if (!raw) { router.replace("/scan"); return; }
@@ -35,20 +45,46 @@ export default function ScanConfirmPage() {
     setScanResult(result);
     if (result.ai_analysis) {
       setTitle(result.ai_analysis.title ?? "");
-      setCategory(result.ai_analysis.category ?? null);
+      setAiCategoryName(result.ai_analysis.category ?? null);
       setHasDeadline(result.ai_analysis.has_deadline);
       setDeadlineDate(result.ai_analysis.deadline ?? "");
     }
   }, [router]);
 
+  // カテゴリ一覧・グループ一覧をAPIから取得
+  useEffect(() => {
+    categoryApi.list().then(setCategories).catch(() => setCategories([]));
+    groupApi.list().then((gs) => {
+      setGroups(gs);
+      if (gs.length > 0) setGroupId(gs[0].id); // 最初のグループを自動選択（変更は手動で可能）
+    }).catch(() => setGroups([]));
+  }, []);
+
+  // AIが判定したカテゴリ名 → カテゴリ一覧が揃ってからidに変換して自動選択
+  useEffect(() => {
+    if (aiCategoryName && categories.length > 0 && !categoryId) {
+      const matched = categories.find((c) => c.name === aiCategoryName);
+      if (matched) setCategoryId(matched.id);
+    }
+  }, [aiCategoryName, categories, categoryId]);
+
   const handleSubmit = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || !groupId || !scanResult?.image_url) return;
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      // TODO Week2: POST /v1/documents
-      console.log("登録データ:", { title, category, hasDeadline, deadlineDate });
+      await documentApi.create({
+        group_id: groupId,
+        category_id: categoryId,
+        title,
+        image_url: scanResult.image_url,
+        has_deadline: hasDeadline,
+        deadline_date: hasDeadline ? deadlineDate : null,
+      });
       sessionStorage.removeItem("scanResult");
       router.replace("/calendar");
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "登録に失敗しました");
     } finally {
       setIsSubmitting(false);
     }
@@ -106,27 +142,45 @@ export default function ScanConfirmPage() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="タイトルを入力してください"
             className="w-full rounded-2xl px-4 py-3 text-sm outline-none bg-white text-[#1F2D24]"
-            style={{
-              border: `1px solid ${!title.trim() ? "#E24B4A" : "#D2D4BC"}`,
-            }}
+            style={{ border: `1px solid ${!title.trim() ? "#E24B4A" : "#D2D4BC"}` }}
           />
         </div>
 
-        {/* カテゴリ */}
+        {/* カテゴリ（APIから取得した11種類） */}
         <div>
           <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">カテゴリ</p>
           <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <button
-                key={cat}
+                key={cat.id}
                 type="button"
-                onClick={() => setCategory(cat === category ? null : cat)}
+                onClick={() => setCategoryId(cat.id === categoryId ? null : cat.id)}
                 className="px-3 py-1.5 rounded-full text-sm transition-colors"
-                style={category === cat
+                style={categoryId === cat.id
                   ? { backgroundColor: "#557C79", color: "#fff" }
                   : { backgroundColor: "#fff", color: "#557C79", border: "1px solid #D2D4BC" }}
               >
-                {cat}
+                {cat.icon ? `${cat.icon} ` : ""}{cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 登録先グループ */}
+        <div>
+          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">登録先グループ</p>
+          <div className="flex flex-wrap gap-2">
+            {groups.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setGroupId(g.id)}
+                className="px-3 py-1.5 rounded-full text-sm transition-colors"
+                style={groupId === g.id
+                  ? { backgroundColor: "#557C79", color: "#fff" }
+                  : { backgroundColor: "#fff", color: "#557C79", border: "1px solid #D2D4BC" }}
+              >
+                {g.name}
               </button>
             ))}
           </div>
@@ -134,9 +188,7 @@ export default function ScanConfirmPage() {
 
         {/* 期限の有無 */}
         <div className="rounded-2xl px-4 py-3 flex items-center justify-between bg-white border border-[#D2D4BC]">
-          <p className="text-sm text-[#1F2D24]">
-            {hasDeadline ? "期限あり" : "期限なし"}
-          </p>
+          <p className="text-sm text-[#1F2D24]">{hasDeadline ? "期限あり" : "期限なし"}</p>
           <button
             type="button"
             onClick={() => setHasDeadline((v) => !v)}
@@ -163,13 +215,19 @@ export default function ScanConfirmPage() {
           </div>
         )}
 
+        {submitError && (
+          <div className="rounded-2xl px-4 py-3 text-sm" style={{ backgroundColor: "#FCEBEB", color: "#E24B4A" }}>
+            {submitError}
+          </div>
+        )}
+
         {/* 登録ボタン */}
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!title.trim() || isSubmitting}
+          disabled={!title.trim() || !groupId || isSubmitting}
           className="w-full rounded-2xl py-4 text-sm font-medium text-white transition-colors"
-          style={{ backgroundColor: !title.trim() ? "#D2D4BC" : "#557C79" }}
+          style={{ backgroundColor: (!title.trim() || !groupId) ? "#D2D4BC" : "#557C79" }}
         >
           {isSubmitting ? "登録中..." : isAnalyzed ? "✓ この内容で登録する" : "✓ 手入力で登録する"}
         </button>

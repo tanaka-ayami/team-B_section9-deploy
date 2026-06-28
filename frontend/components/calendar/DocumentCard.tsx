@@ -3,19 +3,11 @@
 import { useRouter } from "next/navigation";
 import { DeadlineBadge } from "./DeadlineBadge";
 
-// カテゴリ別アイコン
-const CATEGORY_ICONS: Record<string, string> = {
-  学校: "🎓",
-  医療: "🏥",
-  行政: "🏛",
-  保険: "📋",
-  その他: "📄",
-};
-
 interface DocumentCardProps {
   id: string;
   title: string;
   categoryName?: string;
+  categoryIcon?: string;  // ← この1行を追加
   createdByName?: string;
   deadlineDate?: string;
   hasDeadline: boolean;
@@ -25,14 +17,14 @@ interface DocumentCardProps {
 export function DocumentCard({
   id,
   title,
-  categoryName,
+  categoryIcon,
   createdByName,
   deadlineDate,
   hasDeadline,
   isDone,
 }: DocumentCardProps) {
   const router = useRouter();
-  const icon = CATEGORY_ICONS[categoryName ?? ""] ?? "📄";
+  const icon = categoryIcon ?? "📄";
 
   return (
     <button

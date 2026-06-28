@@ -1,54 +1,86 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { DocumentCard } from "@/components/calendar/DocumentCard";
 import { FAB } from "@/components/layout/FAB";
+import { groupApi, documentApi, categoryApi, Document, Category } from "@/lib/api";
 
-const MOCK_DOCUMENTS = [
-  {
-    id: "doc-001",
-    title: "夏期講習 申込書",
-    categoryName: "学校",
-    createdByName: "花子",
-    deadlineDate: "2026-06-26",
-    hasDeadline: true,
-    isDone: false,
-  },
-  {
-    id: "doc-002",
-    title: "PTA会費 納入のお知らせ",
-    categoryName: "保険",
-    createdByName: "花子",
-    deadlineDate: "2026-06-30",
-    hasDeadline: true,
-    isDone: false,
-  },
-  {
-    id: "doc-003",
-    title: "定期健康診断のご案内",
-    categoryName: "医療",
-    createdByName: "太郎",
-    deadlineDate: "2026-06-24",
-    hasDeadline: true,
-    isDone: true,
-  },
-];
+interface DisplayDocument {
+  id: string;
+  title: string;
+  categoryName?: string;
+  categoryIcon?: string;
+  createdByName?: string;
+  deadlineDate?: string;
+  hasDeadline: boolean;
+  isDone: boolean;
+}
 
 export default function CalendarPage() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [documents, setDocuments] = useState<DisplayDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const calendarEvents = MOCK_DOCUMENTS
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setIsLoading(true);
+      try {
+        const [groups, categories] = await Promise.all([
+          groupApi.list(),
+          categoryApi.list(),
+        ]);
+        const categoryIconById = new Map<string, string>(
+          categories.map((c: Category) => [c.id, c.icon ?? "📄"])
+        );
+
+        // 所属する全グループの「書類一覧」と「メンバー一覧」をまとめて取得
+        const [docsByGroup, membersByGroup] = await Promise.all([
+          Promise.all(groups.map((g) => documentApi.list(g.id))),
+          Promise.all(groups.map((g) => groupApi.getMembers(g.id))),
+        ]);
+
+        const displayNameByUserId = new Map<string, string>();
+        membersByGroup.flat().forEach((m) => {
+          displayNameByUserId.set(m.user_id, m.display_name);
+        });
+
+        const allDocs: DisplayDocument[] = docsByGroup.flat().map((d: Document) => ({
+          id: d.id,
+          title: d.title ?? "(無題)",
+          categoryName: d.categoryName ?? undefined,
+          categoryIcon: d.category_id ? categoryIconById.get(d.category_id) : undefined,
+          createdByName: displayNameByUserId.get(d.created_by),
+          deadlineDate: d.deadline_date ?? undefined,
+          hasDeadline: d.has_deadline,
+          isDone: d.is_done,
+        }));
+
+        if (!cancelled) setDocuments(allDocs);
+      } catch (e) {
+        if (!cancelled) setDocuments([]);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const calendarEvents = documents
     .filter((d) => d.hasDeadline && d.deadlineDate)
     .map((d) => ({
       id: d.id,
       title: d.title,
-      date: d.deadlineDate,
+      date: d.deadlineDate as string,
       isDone: d.isDone,
     }));
 
-  const monthlyDocuments = MOCK_DOCUMENTS.filter((d) => {
+  const monthlyDocuments = documents.filter((d) => {
     if (!d.deadlineDate) return false;
     const [y, m] = d.deadlineDate.split("-").map(Number);
     return y === currentYear && m === currentMonth;
@@ -71,7 +103,9 @@ export default function CalendarPage() {
         <p className="text-xs mb-3 text-[#557C79] opacity-60">
           {currentYear}年{currentMonth}月の書類
         </p>
-        {monthlyDocuments.length === 0 ? (
+        {isLoading ? (
+          <p className="text-sm text-center py-8 text-[#8fa09e]">読み込み中...</p>
+        ) : monthlyDocuments.length === 0 ? (
           <p className="text-sm text-center py-8 text-[#8fa09e]">
             この月の書類はありません
           </p>
