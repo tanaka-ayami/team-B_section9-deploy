@@ -13,4 +13,5 @@ firebase-admin
 pydantic-settings
 pytest
 httpx
+sendgrid
 
