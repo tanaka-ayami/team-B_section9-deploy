@@ -62,6 +62,7 @@ export interface Document {
   id: string;
   group_id: string;
   category_id: string | null;
+  categoryName: string | null; // バックエンドが解決済みで返してくれる
   title: string | null;
   image_url: string;
   has_deadline: boolean;
@@ -124,6 +125,17 @@ export interface UserMe {
   remind_days_before: number;
 }
 
+// バックエンドの DocumentCreate スキーマ（documents.py）に合わせた登録用の型
+// ※ created_by はトークンから自動設定、is_done はバックエンドが受け取らないため除外
+export interface DocumentCreateInput {
+  group_id: string;
+  category_id?: string | null;
+  title?: string | null;
+  image_url: string;
+  has_deadline?: boolean;
+  deadline_date?: string | null;
+}
+
 // ===== ユーザー =====
 
 export const userApi = {
@@ -138,20 +150,16 @@ export const userApi = {
 // ===== 書類 =====
 
 export const documentApi = {
-  // GET /v1/documents?group_id=xxx
-  list: (groupId: string, params?: { category_id?: string; has_deadline?: boolean; year?: number; month?: number }) => {
-    const query = new URLSearchParams({ group_id: groupId });
-    if (params?.category_id) query.set("category_id", params.category_id);
-    if (params?.has_deadline !== undefined) query.set("has_deadline", String(params.has_deadline));
-    if (params?.year) query.set("year", String(params.year));
-    if (params?.month) query.set("month", String(params.month));
-    return apiClient.get<Document[]>("/v1/documents?" + query.toString());
-  },
+  // GET /v1/groups/{group_id}/documents（バックエンドの実際のパスに合わせて修正）
+  list: (groupId: string) =>
+    apiClient
+      .get<{ documents: Document[] }>(`/v1/groups/${groupId}/documents`)
+      .then((res) => res.documents),
   // GET /v1/documents/:id
   get: (id: string) =>
     apiClient.get<Document>("/v1/documents/" + id),
   // POST /v1/documents
-  create: (body: Omit<Document, "id" | "created_at">) =>
+  create: (body: DocumentCreateInput) =>
     apiClient.post<Document>("/v1/documents", body),
   // PATCH /v1/documents/:id
   update: (id: string, body: Partial<Document>) =>
