@@ -1,42 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-
-// モックデータ（Week2でAPI差し替え）
-const MOCK_GROUPS: Record<string, {
-  id: string;
-  name: string;
-  createdBy: string;
-  members: { id: string; displayName: string; email: string }[];
-  invitations: { id: string; inviteeEmail: string; status: string }[];
-}> = {
-  "group-001": {
-    id: "group-001",
-    name: "山田 太郎のマイグループ",
-    createdBy: "user-001",
-    members: [
-      { id: "user-001", displayName: "山田 太郎", email: "taro@example.com" },
-    ],
-    invitations: [],
-  },
-  "group-002": {
-    id: "group-002",
-    name: "山田ファミリー",
-    createdBy: "user-001",
-    members: [
-      { id: "user-001", displayName: "山田 太郎", email: "taro@example.com" },
-      { id: "user-002", displayName: "山田 花子", email: "hanako@example.com" },
-      { id: "user-003", displayName: "山田 祖母", email: "sobo@example.com" },
-    ],
-    invitations: [
-      { id: "inv-001", inviteeEmail: "jiro@example.com", status: "pending" },
-    ],
-  },
-};
-
-// 自分のユーザーID（Week2でFirebase Auth から取得）
-const CURRENT_USER_ID = "user-001";
+import { groupApi, userApi, Group, GroupMember, Invitation } from "@/lib/api";
 
 // アバター背景色
 const AVATAR_COLORS = ["#ADCFBA", "#D2D4BC", "#FFF0E8", "#EEF1EC", "#f2f1ec"];
@@ -48,12 +14,14 @@ function BottomModal({
   onClose,
   onSubmit,
   submitLabel,
+  submitting,
   children,
 }: {
   title: string;
   onClose: () => void;
   onSubmit: () => void;
   submitLabel: string;
+  submitting?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -65,10 +33,11 @@ function BottomModal({
         <button
           type="button"
           onClick={onSubmit}
-          className="w-full py-3 rounded-xl text-sm font-semibold text-white"
+          disabled={submitting}
+          className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
           style={{ backgroundColor: "#557C79" }}
         >
-          {submitLabel}
+          {submitting ? "処理中..." : submitLabel}
         </button>
         <button
           type="button"
@@ -87,43 +56,115 @@ export default function GroupDetailPage() {
   const params = useParams();
   const groupId = params.id as string;
 
-  // URLのidに応じてグループデータを切り替え（Week2でGET /v1/groups/:id/members に差し替え）
-  const group = MOCK_GROUPS[groupId] ?? MOCK_GROUPS["group-002"];
-  const isAdmin = group.createdBy === CURRENT_USER_ID;
+  const [group, setGroup] = useState<Group | null>(null);
+  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [groupName, setGroupName] = useState(group.name);
-  const [newGroupName, setNewGroupName] = useState(group.name);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [modalSubmitting, setModalSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
-  const handleInvite = () => {
-    if (!inviteEmail) return;
-    // Week2でPOST /v1/groups/:id/invite に差し替え
-    alert(inviteEmail + " に招待を送りました");
-    setInviteEmail("");
-    setShowInviteModal(false);
+  const isAdmin = group?.created_by === currentUserId;
+
+  const loadData = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [groups, memberList, invitationList, me] = await Promise.all([
+        groupApi.list(),
+        groupApi.getMembers(groupId),
+        groupApi.getInvitations(groupId),
+        userApi.getMe(),
+      ]);
+      const matched = groups.find((g) => g.id === groupId) ?? null;
+      setGroup(matched);
+      setMembers(memberList);
+      setInvitations(invitationList);
+      setCurrentUserId(me.id);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "読み込みに失敗しました");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleRename = () => {
-    if (!newGroupName.trim()) return;
-    // Week2でPATCH /v1/groups/:id に差し替え
-    setGroupName(newGroupName);
-    setShowRenameModal(false);
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setModalSubmitting(true);
+    setModalError(null);
+    try {
+      await groupApi.invite(groupId, inviteEmail.trim());
+      const invitationList = await groupApi.getInvitations(groupId);
+      setInvitations(invitationList);
+      setInviteEmail("");
+      setShowInviteModal(false);
+    } catch (e) {
+      setModalError(e instanceof Error ? e.message : "招待の送信に失敗しました");
+    } finally {
+      setModalSubmitting(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleRename = async () => {
+    if (!newGroupName.trim() || !group) return;
+    setModalSubmitting(true);
+    setModalError(null);
+    try {
+      const updated = await groupApi.update(groupId, newGroupName.trim());
+      setGroup(updated);
+      setShowRenameModal(false);
+    } catch (e) {
+      setModalError(e instanceof Error ? e.message : "グループ名の変更に失敗しました");
+    } finally {
+      setModalSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!group) return;
     const confirmed = window.confirm(
-      "「" + groupName + "」を削除しますか？\nグループ内の書類も削除されます。"
+      "「" + group.name + "」を削除しますか？\nグループ内の書類も削除されます。"
     );
     if (!confirmed) return;
-    // Week2でDELETE /v1/groups/:id に差し替え
-    router.replace("/settings");
+    try {
+      await groupApi.delete(groupId);
+      router.replace("/settings");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "削除に失敗しました");
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f2f1ec]">
+        <p className="text-sm text-[#8fa09e]">読み込み中...</p>
+      </div>
+    );
+  }
+
+  if (loadError || !group) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f2f1ec] px-4">
+        <p className="text-sm text-[#E24B4A] text-center">
+          {loadError ?? "グループが見つかりません"}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f2f1ec]">
-
       {/* ヘッダー */}
       <div className="bg-[#557C79] px-4 pt-12 pb-4 flex items-center gap-3">
         <button
@@ -141,14 +182,13 @@ export default function GroupDetailPage() {
       </div>
 
       <div className="px-4 py-4 space-y-4 pb-8">
-
         {/* メンバー一覧 */}
         <div>
           <p className="text-xs text-[#8fa09e] mb-2 px-1">
-            {"メンバー（" + group.members.length + "人）"}
+            {"メンバー（" + members.length + "人）"}
           </p>
           <div className="bg-white rounded-2xl overflow-hidden">
-            {group.members.map((member, index) => (
+            {members.map((member, index) => (
               <div key={member.id}>
                 {index > 0 && <div className="h-px bg-[#f2f1ec] mx-4" />}
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -156,21 +196,20 @@ export default function GroupDetailPage() {
                     className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold text-[#557C79] flex-shrink-0"
                     style={{ backgroundColor: getAvatarColor(index) }}
                   >
-                    {member.displayName.charAt(0)}
+                    {member.display_name.charAt(0)}
                   </span>
                   <div>
-                    <p className="text-sm font-medium text-[#1F2D24]">{member.displayName}</p>
+                    <p className="text-sm font-medium text-[#1F2D24]">{member.display_name}</p>
                     <p className="text-xs text-[#8fa09e]">{member.email}</p>
                   </div>
                 </div>
               </div>
             ))}
-
             {/* 招待ボタン */}
             <div className="h-px bg-[#f2f1ec] mx-4" />
             <button
               type="button"
-              onClick={() => setShowInviteModal(true)}
+              onClick={() => { setModalError(null); setShowInviteModal(true); }}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f1ec] transition-colors"
             >
               <span className="w-9 h-9 rounded-full border-2 border-dashed border-[#D45D1E] flex items-center justify-center flex-shrink-0">
@@ -184,18 +223,18 @@ export default function GroupDetailPage() {
         </div>
 
         {/* 招待中 */}
-        {group.invitations.length > 0 && (
+        {invitations.length > 0 && (
           <div>
             <p className="text-xs text-[#8fa09e] mb-2 px-1">招待中</p>
             <div className="bg-white rounded-2xl overflow-hidden">
-              {group.invitations.map((inv, index) => (
+              {invitations.map((inv, index) => (
                 <div key={inv.id}>
                   {index > 0 && <div className="h-px bg-[#f2f1ec] mx-4" />}
                   <div className="flex items-center gap-3 px-4 py-3">
                     <svg className="w-5 h-5 text-[#8fa09e] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                     </svg>
-                    <p className="text-sm text-[#1F2D24] flex-1">{inv.inviteeEmail}</p>
+                    <p className="text-sm text-[#1F2D24] flex-1">{inv.invitee_email}</p>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-[#FFF0E8] text-[#D45D1E]">
                       pending
                     </span>
@@ -222,7 +261,7 @@ export default function GroupDetailPage() {
           <div className="bg-white rounded-2xl overflow-hidden">
             <button
               type="button"
-              onClick={() => { setNewGroupName(groupName); setShowRenameModal(true); }}
+              onClick={() => { setModalError(null); setNewGroupName(group.name); setShowRenameModal(true); }}
               className="w-full flex items-center gap-3 px-4 py-4 hover:bg-[#f2f1ec] transition-colors"
             >
               <svg className="w-5 h-5 text-[#557C79]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
@@ -233,9 +272,7 @@ export default function GroupDetailPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
               </svg>
             </button>
-
             <div className="h-px bg-[#f2f1ec] mx-4" />
-
             {/* グループ削除（created_byのみ操作可能） */}
             <button
               type="button"
@@ -254,7 +291,6 @@ export default function GroupDetailPage() {
             </button>
           </div>
         </div>
-
       </div>
 
       {/* 招待モーダル */}
@@ -264,7 +300,11 @@ export default function GroupDetailPage() {
           onClose={() => setShowInviteModal(false)}
           onSubmit={handleInvite}
           submitLabel="招待を送る"
+          submitting={modalSubmitting}
         >
+          {modalError && (
+            <p className="text-xs text-[#E24B4A]">{modalError}</p>
+          )}
           <input
             type="email"
             value={inviteEmail}
@@ -282,7 +322,11 @@ export default function GroupDetailPage() {
           onClose={() => setShowRenameModal(false)}
           onSubmit={handleRename}
           submitLabel="変更する"
+          submitting={modalSubmitting}
         >
+          {modalError && (
+            <p className="text-xs text-[#E24B4A]">{modalError}</p>
+          )}
           <input
             type="text"
             value={newGroupName}
@@ -292,7 +336,6 @@ export default function GroupDetailPage() {
           />
         </BottomModal>
       )}
-
     </div>
   );
 }

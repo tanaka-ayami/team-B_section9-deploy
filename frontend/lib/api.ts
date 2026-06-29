@@ -211,5 +211,31 @@ export const groupApi = {
     apiClient.get<GroupMember[]>("/v1/groups/" + id + "/members"),
   // POST /v1/groups/:id/invite
   invite: (id: string, email: string) =>
-    apiClient.post<Invitation>("/v1/groups/" + id + "/invite", { email }),
+  apiClient.post<Invitation>("/v1/groups/" + id + "/invite", { invitee_email: email }),
+  // GET /v1/groups/:id/invitations
+  getInvitations: (id: string) =>
+    apiClient.get<Invitation[]>("/v1/groups/" + id + "/invitations"),
+};
+
+// ===== 招待（招待された側） =====
+
+export interface InvitationPublic {
+  group_name: string;
+  invited_by_email: string;
+  status: string;
+  expires_at: string;
+}
+
+export const invitationApi = {
+  // GET /v1/invitations/:token（認証不要）
+  get: (token: string) =>
+    apiClient.get<InvitationPublic>("/v1/invitations/" + token),
+  // POST /v1/invitations/:token/accept
+  accept: (token: string) =>
+    apiClient.post<{ group_id: string; status: string; message: string }>(
+      "/v1/invitations/" + token + "/accept"
+    ),
+  // POST /v1/invitations/:token/reject
+  reject: (token: string) =>
+    apiClient.post<{ status: string }>("/v1/invitations/" + token + "/reject"),
 };

@@ -108,7 +108,7 @@ def list_group_members(
     _require_member(db, group_id, current_user.id)
 
     rows = (
-        db.query(GroupMember, User.email)
+        db.query(GroupMember, User.email, User.display_name)
         .join(User, User.id == GroupMember.user_id)
         .filter(GroupMember.group_id == group_id)
         .all()
@@ -119,9 +119,10 @@ def list_group_members(
             group_id=member.group_id,
             user_id=member.user_id,
             email=email,
+            display_name=display_name,
             joined_at=member.joined_at,
         )
-        for member, email in rows
+        for member, email, display_name in rows
     ]
 
 
@@ -157,3 +158,24 @@ def invite_to_group(
     )
 
     return invitation
+
+
+@router.get("/{group_id}/invitations", response_model=list[InvitationRead])
+def list_group_invitations(
+    group_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    グループの招待中（pending）一覧を取得する。
+    招待された側の同意・拒否操作には影響しない、参照専用のエンドポイント。
+    """
+    _get_group_or_404(db, group_id)
+    _require_member(db, group_id, current_user.id)
+
+    return (
+        db.query(Invitation)
+        .filter(Invitation.group_id == group_id, Invitation.status == "pending")
+        .order_by(Invitation.created_at.desc())
+        .all()
+    )
