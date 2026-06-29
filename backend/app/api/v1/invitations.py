@@ -57,6 +57,13 @@ def accept_invitation(
     if invitation.status != "pending":
         raise APIError(409, "INVITATION_ALREADY_HANDLED", "この招待は既に処理済みです")
 
+    if current_user.email != invitation.invitee_email:
+        raise APIError(
+            403,
+            "INVITATION_EMAIL_MISMATCH",
+            "この招待は別のメールアドレス宛に送られています。招待されたメールアドレスでログインしてください。",
+        )
+
     already_member = (
         db.query(GroupMember)
         .filter(
