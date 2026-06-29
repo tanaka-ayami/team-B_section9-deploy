@@ -19,9 +19,9 @@ class GroupRead(BaseModel):
 
 class GroupMemberRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     group_id: uuid.UUID
     user_id: uuid.UUID
     email: str
+    display_name: str
     joined_at: datetime
