@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FirebaseError } from "firebase/app";
 import { loginWithEmail, registerWithEmail, resetPassword, getIdToken } from "@/lib/firebase";
 import { firebaseErrorToJa } from "@/lib/utils";
@@ -47,6 +47,8 @@ function validate(
 
 export function AuthForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/calendar";
   const [tab, setTab] = useState<AuthTab>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,7 +74,7 @@ export function AuthForm() {
     setError(null);
     try {
       await loginWithEmail(email, password);
-      router.replace("/calendar");
+      router.replace(redirectTo);
     } catch (e) {
       setError(e instanceof FirebaseError ? firebaseErrorToJa(e.code) : "エラーが発生しました");
     } finally {
@@ -101,8 +103,7 @@ export function AuthForm() {
       if (!res.ok) {
         throw new Error(`サーバーエラーが発生しました（${res.status}）`);
       }
-
-      router.replace("/calendar");
+      router.replace(redirectTo);
     } catch (e) {
       setError(e instanceof FirebaseError ? firebaseErrorToJa(e.code) : "エラーが発生しました");
     } finally {
