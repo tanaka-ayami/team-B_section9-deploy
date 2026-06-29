@@ -13,6 +13,8 @@ def create_document_notifications(
     """
     書類登録時に、登録者以外のグループメンバーへ通知レコードを作成する。
     メッセージには登録者の表示名（display_name）を使用する。
+    user_idに宛先を設定することで、個人ごとの既読管理に対応する
+    （issue #20既知の不具合対応）。
     """
     member_ids = get_group_member_user_ids(db, group_id)
 
@@ -26,6 +28,7 @@ def create_document_notifications(
         notification = AppNotification(
             group_id=group_id,
             triggered_by=created_by_user_id,
+            user_id=member_id,
             document_id=document_id,
             message=f"{creator_name}さんが書類を登録しました",
         )
