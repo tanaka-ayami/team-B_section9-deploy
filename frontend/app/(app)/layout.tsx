@@ -68,7 +68,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col bg-screen">
       <AppHeader
-        groupName="山田ファミリー"
         unreadCount={unreadCount}
         onBellClick={() => setDrawerOpen(true)}
       />
