@@ -4,16 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { categoryApi, groupApi, documentApi, Category, Group } from "@/lib/api";
 
-interface AiAnalysis {
+interface ScanResult {
+  image_url: string | null;
   title: string | null;
   category: string | null;
   deadline: string | null;
   has_deadline: boolean;
-}
-
-interface ScanResult {
-  image_url: string | null;
-  ai_analysis: AiAnalysis | null;
 }
 
 export default function ScanConfirmPage() {
@@ -35,29 +31,40 @@ export default function ScanConfirmPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const isAnalyzed = scanResult?.ai_analysis !== null;
+  // 解析できたかどうかは title が取れているかで判定する
+  // （バックエンドのレスポンスはネストせずフラットな形で返ってくる）
+  const isAnalyzed = !!scanResult?.title;
 
   // スキャン結果の読み込み
   useEffect(() => {
     const raw = sessionStorage.getItem("scanResult");
-    if (!raw) { router.replace("/scan"); return; }
+    if (!raw) {
+      router.replace("/scan");
+      return;
+    }
     const result: ScanResult = JSON.parse(raw);
     setScanResult(result);
-    if (result.ai_analysis) {
-      setTitle(result.ai_analysis.title ?? "");
-      setAiCategoryName(result.ai_analysis.category ?? null);
-      setHasDeadline(result.ai_analysis.has_deadline);
-      setDeadlineDate(result.ai_analysis.deadline ?? "");
+    if (result.title) {
+      setTitle(result.title ?? "");
+      setAiCategoryName(result.category ?? null);
+      setHasDeadline(result.has_deadline);
+      setDeadlineDate(result.deadline ?? "");
     }
   }, [router]);
 
   // カテゴリ一覧・グループ一覧をAPIから取得
   useEffect(() => {
-    categoryApi.list().then(setCategories).catch(() => setCategories([]));
-    groupApi.list().then((gs) => {
-      setGroups(gs);
-      if (gs.length > 0) setGroupId(gs[0].id); // 最初のグループを自動選択（変更は手動で可能）
-    }).catch(() => setGroups([]));
+    categoryApi
+      .list()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+    groupApi
+      .list()
+      .then((gs) => {
+        setGroups(gs);
+        if (gs.length > 0) setGroupId(gs[0].id); // 最初のグループを自動選択（変更は手動で可能）
+      })
+      .catch(() => setGroups([]));
   }, []);
 
   // AIが判定したカテゴリ名 → カテゴリ一覧が揃ってからidに変換して自動選択
@@ -102,23 +109,41 @@ export default function ScanConfirmPage() {
           className="w-9 h-9 rounded-full flex items-center justify-center mr-3"
           style={{ background: "rgba(255,255,255,0.2)" }}
         >
-          <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/>
+          <svg
+            className="w-5 h-5 text-white"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 19.5 8.25 12l7.5-7.5"
+            />
           </svg>
         </button>
-        <h1 className="text-white text-base font-medium">解析結果の確認・編集</h1>
+        <h1 className="text-white text-base font-medium">
+          解析結果の確認・編集
+        </h1>
       </div>
 
       <div className="px-4 pt-4 space-y-4">
         {/* 画像プレビュー */}
         {scanResult.image_url && (
           <div className="relative rounded-2xl overflow-hidden bg-white border border-[#D2D4BC]">
-            <img src={scanResult.image_url} alt="書類" className="w-full object-contain max-h-48"/>
+            <img
+              src={scanResult.image_url}
+              alt="書類"
+              className="w-full object-contain max-h-48"
+            />
             <span
               className="absolute top-2 right-2 text-xs px-2 py-1 rounded-full font-medium"
-              style={isAnalyzed
-                ? { backgroundColor: "#f2f1ec", color: "#557C79" }
-                : { backgroundColor: "#FCEBEB", color: "#E24B4A" }}
+              style={
+                isAnalyzed
+                  ? { backgroundColor: "#f2f1ec", color: "#557C79" }
+                  : { backgroundColor: "#FCEBEB", color: "#E24B4A" }
+              }
             >
               {isAnalyzed ? "✦ AI解析済み" : "⚠ 解析失敗"}
             </span>
@@ -127,40 +152,57 @@ export default function ScanConfirmPage() {
 
         {/* エラーバナー */}
         {!isAnalyzed && (
-          <div className="rounded-2xl px-4 py-3 text-sm"
-            style={{ backgroundColor: "#FCEBEB", color: "#E24B4A" }}>
+          <div
+            className="rounded-2xl px-4 py-3 text-sm"
+            style={{ backgroundColor: "#FCEBEB", color: "#E24B4A" }}
+          >
             ⚠ 解析ができませんでした。手動での入力をお願いします
           </div>
         )}
 
         {/* 書類タイトル */}
         <div>
-          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">書類タイトル</p>
+          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">
+            書類タイトル
+          </p>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="タイトルを入力してください"
             className="w-full rounded-2xl px-4 py-3 text-sm outline-none bg-white text-[#1F2D24]"
-            style={{ border: `1px solid ${!title.trim() ? "#E24B4A" : "#D2D4BC"}` }}
+            style={{
+              border: `1px solid ${!title.trim() ? "#E24B4A" : "#D2D4BC"}`,
+            }}
           />
         </div>
 
         {/* カテゴリ（APIから取得した11種類） */}
         <div>
-          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">カテゴリ</p>
+          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">
+            カテゴリ
+          </p>
           <div className="flex flex-wrap gap-2">
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 type="button"
-                onClick={() => setCategoryId(cat.id === categoryId ? null : cat.id)}
+                onClick={() =>
+                  setCategoryId(cat.id === categoryId ? null : cat.id)
+                }
                 className="px-3 py-1.5 rounded-full text-sm transition-colors"
-                style={categoryId === cat.id
-                  ? { backgroundColor: "#557C79", color: "#fff" }
-                  : { backgroundColor: "#fff", color: "#557C79", border: "1px solid #D2D4BC" }}
+                style={
+                  categoryId === cat.id
+                    ? { backgroundColor: "#557C79", color: "#fff" }
+                    : {
+                        backgroundColor: "#fff",
+                        color: "#557C79",
+                        border: "1px solid #D2D4BC",
+                      }
+                }
               >
-                {cat.icon ? `${cat.icon} ` : ""}{cat.name}
+                {cat.icon ? `${cat.icon} ` : ""}
+                {cat.name}
               </button>
             ))}
           </div>
@@ -168,7 +210,9 @@ export default function ScanConfirmPage() {
 
         {/* 登録先グループ */}
         <div>
-          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">登録先グループ</p>
+          <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">
+            登録先グループ
+          </p>
           <div className="flex flex-wrap gap-2">
             {groups.map((g) => (
               <button
@@ -176,9 +220,15 @@ export default function ScanConfirmPage() {
                 type="button"
                 onClick={() => setGroupId(g.id)}
                 className="px-3 py-1.5 rounded-full text-sm transition-colors"
-                style={groupId === g.id
-                  ? { backgroundColor: "#557C79", color: "#fff" }
-                  : { backgroundColor: "#fff", color: "#557C79", border: "1px solid #D2D4BC" }}
+                style={
+                  groupId === g.id
+                    ? { backgroundColor: "#557C79", color: "#fff" }
+                    : {
+                        backgroundColor: "#fff",
+                        color: "#557C79",
+                        border: "1px solid #D2D4BC",
+                      }
+                }
               >
                 {g.name}
               </button>
@@ -188,7 +238,9 @@ export default function ScanConfirmPage() {
 
         {/* 期限の有無 */}
         <div className="rounded-2xl px-4 py-3 flex items-center justify-between bg-white border border-[#D2D4BC]">
-          <p className="text-sm text-[#1F2D24]">{hasDeadline ? "期限あり" : "期限なし"}</p>
+          <p className="text-sm text-[#1F2D24]">
+            {hasDeadline ? "期限あり" : "期限なし"}
+          </p>
           <button
             type="button"
             onClick={() => setHasDeadline((v) => !v)}
@@ -197,7 +249,9 @@ export default function ScanConfirmPage() {
           >
             <span
               className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform"
-              style={{ transform: hasDeadline ? "translateX(22px)" : "translateX(2px)" }}
+              style={{
+                transform: hasDeadline ? "translateX(22px)" : "translateX(2px)",
+              }}
             />
           </button>
         </div>
@@ -205,7 +259,9 @@ export default function ScanConfirmPage() {
         {/* 提出期限 */}
         {hasDeadline && (
           <div>
-            <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">提出期限</p>
+            <p className="text-xs font-medium mb-1.5 text-[#557C79] opacity-70">
+              提出期限
+            </p>
             <input
               type="date"
               value={deadlineDate}
@@ -216,7 +272,10 @@ export default function ScanConfirmPage() {
         )}
 
         {submitError && (
-          <div className="rounded-2xl px-4 py-3 text-sm" style={{ backgroundColor: "#FCEBEB", color: "#E24B4A" }}>
+          <div
+            className="rounded-2xl px-4 py-3 text-sm"
+            style={{ backgroundColor: "#FCEBEB", color: "#E24B4A" }}
+          >
             {submitError}
           </div>
         )}
@@ -227,9 +286,15 @@ export default function ScanConfirmPage() {
           onClick={handleSubmit}
           disabled={!title.trim() || !groupId || isSubmitting}
           className="w-full rounded-2xl py-4 text-sm font-medium text-white transition-colors"
-          style={{ backgroundColor: (!title.trim() || !groupId) ? "#D2D4BC" : "#557C79" }}
+          style={{
+            backgroundColor: !title.trim() || !groupId ? "#D2D4BC" : "#557C79",
+          }}
         >
-          {isSubmitting ? "登録中..." : isAnalyzed ? "✓ この内容で登録する" : "✓ 手入力で登録する"}
+          {isSubmitting
+            ? "登録中..."
+            : isAnalyzed
+              ? "✓ この内容で登録する"
+              : "✓ 手入力で登録する"}
         </button>
 
         <p className="text-xs text-center text-[#8fa09e]">
