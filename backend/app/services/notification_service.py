@@ -12,8 +12,12 @@ def create_document_notifications(
 ):
     """
     書類登録時に、登録者以外のグループメンバーへ通知レコードを作成する。
+    メッセージには登録者の表示名（display_name）を使用する。
     """
     member_ids = get_group_member_user_ids(db, group_id)
+
+    creator = db.query(User).filter(User.id == created_by_user_id).first()
+    creator_name = creator.display_name if creator else "メンバー"
 
     for member_id in member_ids:
         if member_id == created_by_user_id:
@@ -23,7 +27,7 @@ def create_document_notifications(
             group_id=group_id,
             triggered_by=created_by_user_id,
             document_id=document_id,
-            message="グループメンバーが書類を登録しました",
+            message=f"{creator_name}さんが書類を登録しました",
         )
         db.add(notification)
 
