@@ -5,6 +5,7 @@ categories: group_idはnull許容（未分類カテゴリ等の運用に対応�
 app_notifications: 書類登録時にdocuments API内でINSERTする想定（BE②はSELECT/PATCHのみ）。
   group_id（誰に届くかの判定用）とtriggered_by（誰の操作で発生したか）を分けて持つ。
   document_idはdocuments作成と同じPRで対応したため、ON DELETE CASCADEのFK制約を付与済み。
+  【issue #20既知の不具合対応】個人ごとの既読管理にはuser_idが必須のため追加（BE②）。
 notification_schedules: メールリマインド管理（issue #12 MVP外チェックリスト対応）。
 """
 import uuid
@@ -30,6 +31,7 @@ class Category(Base):
     color_code: Mapped[str | None] = mapped_column(String(7), nullable=True)
     icon: Mapped[str | None] = mapped_column(String(20), nullable=True)  # 絵文字を想定（issue #16後の追加変更）
 
+
 class AppNotification(Base):
     __tablename__ = "app_notifications"
 
@@ -42,6 +44,9 @@ class AppNotification(Base):
     triggered_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )  # 通知の宛先（個人ごとの既読管理に使用。issue #20既知の不具合対応）
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
     )
@@ -51,6 +56,7 @@ class AppNotification(Base):
 
     __table_args__ = (
         Index("ix_app_notifications_group_id_created_at", "group_id", "created_at"),
+        Index("ix_app_notifications_user_id", "user_id"),
     )
 
 
@@ -75,3 +81,4 @@ class NotificationSchedule(Base):
         Index("ix_notification_schedules_scheduled_for_status", "scheduled_for", "status"),
         Index("ix_notification_schedules_user_id", "user_id"),
     )
+    

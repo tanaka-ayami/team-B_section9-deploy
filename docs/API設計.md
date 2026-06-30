@@ -1,4 +1,4 @@
-# API設計書（v2.2）
+# API設計書（v2.3）
 
 データベース設計書（v1.3）および要件定義書（v7.4）との整合性を取って再設計したAPI設計書。
 
@@ -7,6 +7,8 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
 > **v2.2での変更点**：`users.display_name`追加に伴い、ユーザー関連エンドポイントのレスポンス・リクエストを更新。
 >
 > **v2.1での変更点（再掲）**：カテゴリAPIの仕様を変更。カテゴリは固定11種類の共通カテゴリのみで運用することとし、`POST` / `PATCH` / `DELETE /categories` を廃止。`GET /categories` のみ提供する。また `DELETE /groups/{id}` の独自エラーコード `GROUP_DELETE_CONFLICT` を追加。
+>
+> **v2.3での変更点**：issue #62（招待フローE2E確認）にて、招待中一覧を取得するエンドポイントが存在しないことが判明したため新規追加。また、`GroupMemberRead`（v2.2で追加予定としていた`display_name`）の実装漏れが見つかり修正された。
 
 ---
 
@@ -52,9 +54,11 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
 | DELETE | `/v1/groups/{id}` | グループ削除 | 必要 | `created_by` のユーザーのみ実行可能。他メンバーは `403 FORBIDDEN_GROUP_ACTION`。紐づく `documents` / `categories` 等が残っており削除できない場合は `409 GROUP_DELETE_CONFLICT`。 |
 | GET | `/v1/groups/{id}/members` | グループメンバー一覧取得 | 必要 | 設定画面（UI-006-G）でのメンバー表示用。レスポンスに `email` と **`display_name`（v2.2で追加）** を含む。 |
 | POST | `/v1/groups/{id}/invite` | グループへの招待発行 | 必要 | `invitations` レコード作成＆SendGridで招待リンクを送信（FR-002）。 |
+| GET | `/v1/groups/{id}/invitations` | グループの招待中（pending）一覧取得 | 必要 | グループ管理画面（UI-006-G）の「招待中」セクション用。`status='pending'`のみを`created_at`降順で返す。グループメンバーであれば誰でも参照可（招待発行者に限定しない）。 |
 | GET | `/v1/invitations/{token}` | 招待情報の取得 | 不要 | 招待ページ表示用（招待元・グループ名の確認）。期限切れでも200を返す（期限切れ表示はFE側で`expires_at`を見て判定）。 |
 | POST | `/v1/invitations/{token}/accept` | 招待の承諾 | 必要 | `group_members` へ追加し、`status` を `accepted` へ更新。期限切れは `410 INVITATION_EXPIRED`。処理済みは `409 INVITATION_ALREADY_HANDLED`。 |
 | POST | `/v1/invitations/{token}/reject` | 招待の拒否 | 必要 | `status` を `rejected` へ更新。期限切れ・処理済みの場合のエラーはacceptと同様。 |
+> 補足：画面設計書（UI-006-G）には `GET /v1/invitations?group_id=xxx` というクエリパラメータ形式のパスが記載されていたが、他のグループ配下リソース（`members`等）と一貫性を取るため、実装は `GET /v1/groups/{id}/invitations`（パスパラメータ形式）を正とする。画面設計書側の記載修正はFE担当の更新時に合わせて反映予定。
 
 ### カテゴリ
 
@@ -270,6 +274,17 @@ Content-Type: application/json
   "color_code": "string | null",
   "icon": "string | null"
 }
+
+// InvitationRead（POST /v1/groups/{id}/invite のレスポンス、および GET /v1/groups/{id}/invitations の各要素）
+{
+  "id": "uuid",
+  "group_id": "uuid",
+  "invited_by": "uuid",
+  "invitee_email": "string",
+  "status": "pending | accepted | rejected",
+  "created_at": "datetime",
+  "expires_at": "datetime"
+}
 ```
 
 ---
@@ -301,3 +316,11 @@ Content-Type: application/json
 - **書類登録（`POST /v1/documents`）**：モバイル通信の瞬断等による重複登録を防ぐため、フロントエンドは画面遷移時に生成した一意のUUIDをヘッダー `X-Idempotency-Key` に付与して送信することを推奨とする。バックエンドは同一キーによる2重リクエストを検知した場合、初回と同じレスポンス（201）を即座に返却する。
 - **済スタンプ等のPATCHリクエスト**：状態の「上書き」であるため冪等キーは不要（何度リクエストしても最終的な状態は変わらないため）。
 - **Stripe Webhook（`POST /v1/billing/webhook`）**：Stripeが送信する `event.id` を用いて重複イベント処理を防止する（同一イベントの再送に対して二重課金処理が起きないようにする）。
+
+---
+
+## 既知の課題（v2.3時点）
+
+| 項目 | 内容 |
+|---|---|
+| 招待受諾時の本人確認の欠落 | `POST /v1/invitations/{token}/accept` は、トークンの有効性のみを検証し、「ログイン中のユーザーのメールアドレス」と「`invitations.invitee_email`」の一致確認を行っていない。トークンを知っている任意のユーザーが参加できてしまう。issue化済み（要対応）。 |

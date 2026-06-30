@@ -28,6 +28,7 @@ router = APIRouter()
 async def scan_document(file: UploadFile = File(...)):
     """
     書類画像を受け取り、Cloudinaryへ保存しつつOpenAIで内容を解析する。
+    レスポンスはネストせず、フラットな形で返す（FE側の型定義に合わせる）。
     """
     tmp_path = None
     try:
@@ -39,11 +40,26 @@ async def scan_document(file: UploadFile = File(...)):
     finally:
         if tmp_path is not None and os.path.exists(tmp_path):
             os.remove(tmp_path)
+
     analysis = analyze_document_image(upload_result["image_url"])
-    return {
-        "image_url": upload_result["image_url"],
-        "ai_analysis": analysis.model_dump() if analysis else None,
-    }
+
+    if analysis:
+        return {
+            "title": analysis.title,
+            "category": analysis.category,
+            "deadline": analysis.deadline,
+            "has_deadline": analysis.has_deadline,
+            "image_url": upload_result["image_url"],
+        }
+    else:
+        # 解析失敗時は各フィールドをnullにして返す（issue #19の要件通り）
+        return {
+            "title": None,
+            "category": None,
+            "deadline": None,
+            "has_deadline": False,
+            "image_url": upload_result["image_url"],
+        }
 
 
 class DocumentCreate(BaseModel):
@@ -142,16 +158,28 @@ def create_document(
 @router.get("/v1/groups/{group_id}/documents")
 def list_documents(
     group_id: UUID,
+    category_id: UUID | None = None,
+    has_deadline: bool | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_db_user),
 ):
     """
     指定したグループの書類一覧を取得する。
+    category_id・has_deadline をクエリパラメータで指定すると絞り込みができる
+    （issue #54：UI-007の絞り込みpill対応）。
     """
     if not is_group_member(db, group_id, current_user.id):
         raise HTTPException(status_code=403, detail="このグループのメンバーではありません")
 
-    documents = db.query(Document).filter(Document.group_id == group_id).all()
+    query = db.query(Document).filter(Document.group_id == group_id)
+
+    if category_id is not None:
+        query = query.filter(Document.category_id == category_id)
+
+    if has_deadline is not None:
+        query = query.filter(Document.has_deadline == has_deadline)
+
+    documents = query.all()
 
     return {"documents": [_document_to_dict(d, db) for d in documents]}
 
@@ -193,7 +221,6 @@ def update_document(
     for key, value in update_data.items():
         setattr(document, key, value)
 
-    # 済スタンプがONになった場合、未送信のリマインド予約をキャンセルする
     if update_data.get("is_done") is True:
         cancel_pending_reminders(db, document_id)
 

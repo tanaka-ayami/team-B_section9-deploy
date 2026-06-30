@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.base import get_db
@@ -10,13 +11,41 @@ from app.api.v1.deps_db import get_current_user as get_current_db_user
 
 router = APIRouter()
 
-@router.get("/v1/notifications")
+
+class AppNotificationResponse(BaseModel):
+    """
+    FE側の型定義（AppNotification interface）に合わせたレスポンス用スキーマ。
+    """
+    id: str
+    group_id: str
+    triggered_by: str
+    document_id: str
+    message: str
+    is_read: bool
+    created_at: str
+
+
+def _notification_to_dict(n: AppNotification) -> dict:
+    """AppNotificationモデルをレスポンス用の辞書に変換する（共通処理）。"""
+    return {
+        "id": str(n.id),
+        "group_id": str(n.group_id),
+        "triggered_by": str(n.triggered_by),
+        "document_id": str(n.document_id),
+        "message": n.message,
+        "is_read": n.is_read,
+        "created_at": n.created_at.isoformat(),
+    }
+
+
+@router.get("/v1/notifications", response_model=list[AppNotificationResponse])
 def get_notifications(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_db_user),
 ):
     """
     ログイン中のユーザー宛のお知らせ一覧を、新着順（created_at降順）で返す。
+    レスポンスは配列を直接返す（FE側の型定義 AppNotification[] に合わせる）。
     """
     notifications = (
         db.query(AppNotification)
@@ -24,19 +53,7 @@ def get_notifications(
         .order_by(AppNotification.created_at.desc())
         .all()
     )
-
-    return {
-        "notifications": [
-            {
-                "id": str(n.id),
-                "document_id": str(n.document_id),
-                "message": n.message,
-                "is_read": n.is_read,
-                "created_at": n.created_at.isoformat(),
-            }
-            for n in notifications
-        ]
-    }
+    return [_notification_to_dict(n) for n in notifications]
 
 
 @router.patch("/v1/notifications/{notification_id}/read")
@@ -56,12 +73,8 @@ def mark_notification_as_read(
         )
         .first()
     )
-
     if notification is None:
         raise HTTPException(status_code=404, detail="お知らせが見つかりません")
-
     notification.is_read = True
     db.commit()
-
     return {"id": str(notification.id), "is_read": notification.is_read}
-    

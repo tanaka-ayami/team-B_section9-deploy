@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FirebaseError } from "firebase/app";
 import { loginWithEmail, registerWithEmail, resetPassword, getIdToken } from "@/lib/firebase";
 import { firebaseErrorToJa } from "@/lib/utils";
@@ -19,13 +19,26 @@ const LockIcon = () => (
   </svg>
 );
 
+const PersonIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+  </svg>
+);
+
 type AuthTab = "login" | "register";
 
-function validate(tab: AuthTab, email: string, password: string, passwordConfirm: string): string | null {
+function validate(
+  tab: AuthTab,
+  email: string,
+  password: string,
+  passwordConfirm: string,
+  displayName: string
+): string | null {
   if (!email.trim()) return "メールアドレスを入力してください";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "メールアドレスの形式が正しくありません";
   if (!password) return "パスワードを入力してください";
   if (tab === "register") {
+    if (!displayName.trim()) return "お名前を入力してください";
     if (password.length < 6) return "パスワードは6文字以上にしてください";
     if (password !== passwordConfirm) return "パスワードが一致しません。もう一度確認してください";
   }
@@ -34,10 +47,13 @@ function validate(tab: AuthTab, email: string, password: string, passwordConfirm
 
 export function AuthForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/calendar";
   const [tab, setTab] = useState<AuthTab>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
@@ -47,17 +63,18 @@ export function AuthForm() {
     setError(null);
     setPassword("");
     setPasswordConfirm("");
+    setDisplayName("");
     setResetSent(false);
   };
 
   const handleLogin = async () => {
-    const err = validate("login", email, password, "");
+    const err = validate("login", email, password, "", "");
     if (err) { setError(err); return; }
     setLoading(true);
     setError(null);
     try {
       await loginWithEmail(email, password);
-      router.replace("/calendar");
+      router.replace(redirectTo);
     } catch (e) {
       setError(e instanceof FirebaseError ? firebaseErrorToJa(e.code) : "エラーが発生しました");
     } finally {
@@ -66,7 +83,7 @@ export function AuthForm() {
   };
 
   const handleRegister = async () => {
-    const err = validate("register", email, password, passwordConfirm);
+    const err = validate("register", email, password, passwordConfirm, displayName);
     if (err) { setError(err); return; }
     setLoading(true);
     setError(null);
@@ -77,17 +94,16 @@ export function AuthForm() {
       const res = await fetch(`${base}/v1/auth/signup`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ display_name: displayName }),
       });
 
       if (!res.ok) {
         throw new Error(`サーバーエラーが発生しました（${res.status}）`);
       }
-
-      router.replace("/calendar");
+      router.replace(redirectTo);
     } catch (e) {
       setError(e instanceof FirebaseError ? firebaseErrorToJa(e.code) : "エラーが発生しました");
     } finally {
@@ -116,24 +132,24 @@ export function AuthForm() {
     <div className="bg-white rounded-t-3xl px-6 pt-8 pb-12">
       <div className="flex rounded-full p-1 mb-7" style={{ background: "#EEF1EC" }}>
         <div
-            role="button"
-            tabIndex={0}
-            onPointerDown={() => switchTab("login")}
-            className="flex-1 py-2 rounded-full text-xs font-medium text-center cursor-pointer select-none"
-            style={tab === "login" ? { background: "#4A7C59", color: "#fff" } : { color: "#6B7C6F" }}
+          role="button"
+          tabIndex={0}
+          onPointerDown={() => switchTab("login")}
+          className="flex-1 py-2 rounded-full text-xs font-medium text-center cursor-pointer select-none"
+          style={tab === "login" ? { background: "#4A7C59", color: "#fff" } : { color: "#6B7C6F" }}
         >
-            ログイン
+          ログイン
         </div>
         <div
-            role="button"
-            tabIndex={0}
-            onPointerDown={() => switchTab("register")}
-            className="flex-1 py-2 rounded-full text-xs font-medium text-center cursor-pointer select-none"
-            style={tab === "register" ? { background: "#4A7C59", color: "#fff" } : { color: "#6B7C6F" }}
+          role="button"
+          tabIndex={0}
+          onPointerDown={() => switchTab("register")}
+          className="flex-1 py-2 rounded-full text-xs font-medium text-center cursor-pointer select-none"
+          style={tab === "register" ? { background: "#4A7C59", color: "#fff" } : { color: "#6B7C6F" }}
         >
-            新規登録
+          新規登録
         </div>
-    </div>
+      </div>
 
       {resetSent && (
         <div className="mb-4 p-3 rounded-xl text-xs" style={{ background: "#EAF3DE", border: "1px solid #86BFAD", color: "#3B6D11" }}>
@@ -157,6 +173,19 @@ export function AuthForm() {
         placeholder="taro@example.com"
         autoComplete="email"
       />
+
+      {tab === "register" && (
+        <FormField
+          label="お名前"
+          icon={<PersonIcon />}
+          type="text"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="お名前（例：山田 太郎）"
+          autoComplete="name"
+        />
+      )}
 
       <FormField
         label="パスワード"

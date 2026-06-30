@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { documentApi } from "@/lib/api";
 
 export default function ScanPage() {
   const router = useRouter();
@@ -14,20 +15,17 @@ export default function ScanPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("/api/v1/documents/scan", {
-        method: "POST",
-        body: formData,
-      });
+      const data = await documentApi.scan(formData);
 
-      if (!res.ok) throw new Error("scan failed");
-
-      const data = await res.json();
       sessionStorage.setItem("scanResult", JSON.stringify(data));
       router.push("/scan-confirm");
     } catch (e) {
       sessionStorage.setItem("scanResult", JSON.stringify({
+        title: null,
+        category: null,
+        deadline: null,
+        has_deadline: false,
         image_url: null,
-        ai_analysis: null,
       }));
       router.push("/scan-confirm");
     } finally {
