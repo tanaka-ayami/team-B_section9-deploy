@@ -6,8 +6,8 @@ DBに登録済みのユーザー情報を返す。
 PATCH /v1/users/me
 表示名（display_name）を更新する（issue #55）。
 メール通知のON/OFF（email_notify_enabled）を更新する（issue #73）。
-display_name・email_notify_enabledはそれぞれ任意項目とし、
-リクエストで送られたフィールドのみを更新する（部分更新）。
+リマインド日数（remind_days_before）を更新する（issue #77）。
+すべて任意項目とし、リクエストで送られたフィールドのみを更新する（部分更新）。
 """
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 class UserUpdate(BaseModel):
     display_name: str | None = Field(None, min_length=1, max_length=50)
     email_notify_enabled: bool | None = None  # 【issue #73追加】未指定の場合は更新しない
+    remind_days_before: int | None = Field(None, ge=1, le=30)  # 【issue #77追加】1〜30の範囲で指定
 
 
 def _user_to_dict(user: User) -> dict:
@@ -50,9 +51,10 @@ def update_current_user(
     current_user: User = Depends(get_current_user),
 ):
     """
-    表示名（display_name）・メール通知設定（email_notify_enabled）を更新する。
-    プロフィール編集画面（issue #52）・設定画面のリマインド設定（issue #73）から呼ばれる。
-    どちらも任意項目のため、リクエストで送られたフィールドのみ更新する。
+    表示名（display_name）・メール通知設定（email_notify_enabled）・
+    リマインド日数（remind_days_before）を更新する。
+    プロフィール編集画面（issue #52）・設定画面のリマインド設定（issue #73・#77）から呼ばれる。
+    すべて任意項目のため、リクエストで送られたフィールドのみ更新する。
     """
     update_data = payload.model_dump(exclude_unset=True)
 
@@ -61,6 +63,9 @@ def update_current_user(
 
     if "email_notify_enabled" in update_data:
         current_user.email_notify_enabled = update_data["email_notify_enabled"]
+
+    if "remind_days_before" in update_data:  # 【issue #77追加】
+        current_user.remind_days_before = update_data["remind_days_before"]
 
     db.commit()
 
