@@ -161,9 +161,7 @@ export default function SettingsPage() {
             <div className="h-px bg-[#f2f1ec] mx-4" />
             <button
               type="button"
-              onClick={() => {
-                // Week2でグループ作成フロー実装
-              }}
+              onClick={() => router.push("/settings/groups/new")}
               className="w-full flex items-center gap-3 px-4 py-4 hover:bg-[#f2f1ec] transition-colors"
             >
               <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
