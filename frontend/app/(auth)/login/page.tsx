@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthForm } from "@/components/auth/AuthForm";
 
 export default function LoginPage() {
@@ -21,7 +22,9 @@ export default function LoginPage() {
         </p>
       </div>
       <div className="flex-[3]">
-        <AuthForm />
+        <Suspense fallback={null}>
+          <AuthForm />
+        </Suspense>
       </div>
     </div>
   );
