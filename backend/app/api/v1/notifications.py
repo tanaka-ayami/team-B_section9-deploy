@@ -7,23 +7,9 @@ from sqlalchemy.orm import Session
 from app.db.base import get_db
 from app.models.notification import AppNotification
 from app.models.user import User
-from app.api.v1.deps import FirebaseUser, get_current_firebase_user
+from app.api.v1.deps_db import get_current_user as get_current_db_user
 
 router = APIRouter()
-
-
-def get_current_db_user(
-    firebase_user: FirebaseUser = Depends(get_current_firebase_user),
-    db: Session = Depends(get_db),
-) -> User:
-    """
-    FirebaseのuidからDB上のUserレコードを取得する。
-    まだusersテーブルにレコードが無い場合は404を返す。
-    """
-    user = db.query(User).filter(User.firebase_uid == firebase_user["uid"]).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="ユーザー情報が見つかりません")
-    return user
 
 
 class AppNotificationResponse(BaseModel):
@@ -67,7 +53,6 @@ def get_notifications(
         .order_by(AppNotification.created_at.desc())
         .all()
     )
-
     return [_notification_to_dict(n) for n in notifications]
 
 
@@ -88,11 +73,8 @@ def mark_notification_as_read(
         )
         .first()
     )
-
     if notification is None:
         raise HTTPException(status_code=404, detail="お知らせが見つかりません")
-
     notification.is_read = True
     db.commit()
-
     return {"id": str(notification.id), "is_read": notification.is_read}

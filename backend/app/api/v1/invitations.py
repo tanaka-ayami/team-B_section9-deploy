@@ -9,7 +9,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps_db import get_current_user
 from app.core.errors import APIError
 from app.db.base import get_db
 from app.models.invitation import Invitation
