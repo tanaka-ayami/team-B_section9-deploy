@@ -8,7 +8,7 @@ from contextlib import contextmanager
 
 import pytest
 
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps_db import get_current_user
 from app.db.base import SessionLocal
 from app.main import app
 from app.models.user import User

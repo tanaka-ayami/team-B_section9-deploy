@@ -6,27 +6,9 @@ from sqlalchemy.orm import Session
 from app.db.base import get_db
 from app.models.notification import AppNotification
 from app.models.user import User
-from app.api.v1.deps import FirebaseUser, get_current_firebase_user
+from app.api.v1.deps_db import get_current_user as get_current_db_user
 
 router = APIRouter()
-
-
-def get_current_db_user(
-    firebase_user: FirebaseUser = Depends(get_current_firebase_user),
-    db: Session = Depends(get_db),
-) -> User:
-    """
-    FirebaseのuidからDB上のUserレコードを取得する。
-    まだusersテーブルにレコードが無い場合は404を返す。
-
-    ※ users.py のTODO（Alembic完了後にupsertする処理）が実装されたら、
-      ここで自動作成するロジックに差し替える可能性あり（BE①と要相談）。
-    """
-    user = db.query(User).filter(User.firebase_uid == firebase_user["uid"]).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="ユーザー情報が見つかりません")
-    return user
-
 
 @router.get("/v1/notifications")
 def get_notifications(
