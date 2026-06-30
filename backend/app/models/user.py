@@ -6,7 +6,7 @@ Firebase Authのuidをそのまま主キーにせず、firebase_uidを別カラ�
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +25,9 @@ class User(Base):
     plan_status: Mapped[str] = mapped_column(String(50), default="free")
     monthly_scan_count: Mapped[int] = mapped_column(Integer, default=0)
     remind_days_before: Mapped[int] = mapped_column(Integer, default=3)
+    email_notify_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )  # 【issue #73追加】メール通知ON/OFF設定。falseの場合アプリ内通知のみ（常時ON）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

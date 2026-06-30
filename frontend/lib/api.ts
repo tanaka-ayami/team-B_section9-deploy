@@ -1,17 +1,26 @@
 import { subscribeIdToken } from "./firebase";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 let currentToken: string | null = null;
 
 if (typeof window !== "undefined") {
-  subscribeIdToken((token) => { currentToken = token; });
+  subscribeIdToken((token) => {
+    currentToken = token;
+  });
 }
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE";
 
-async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+async function request<T>(
+  method: Method,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
   if (currentToken) headers["Authorization"] = `Bearer ${currentToken}`;
 
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -49,10 +58,10 @@ async function requestForm<T>(path: string, formData: FormData): Promise<T> {
 }
 
 export const apiClient = {
-  get:      <T>(path: string)                 => request<T>("GET",    path),
-  post:     <T>(path: string, body?: unknown) => request<T>("POST",   path, body),
-  patch:    <T>(path: string, body?: unknown) => request<T>("PATCH",  path, body),
-  delete:   <T>(path: string)                 => request<T>("DELETE", path),
+  get: <T>(path: string) => request<T>("GET", path),
+  post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
+  patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
+  delete: <T>(path: string) => request<T>("DELETE", path),
   postForm: <T>(path: string, form: FormData) => requestForm<T>(path, form),
 };
 
@@ -123,6 +132,7 @@ export interface UserMe {
   plan_status: string;
   monthly_scan_count: number;
   remind_days_before: number;
+  email_notify_enabled: boolean;
 }
 
 // バックエンドの DocumentCreate スキーマ（documents.py）に合わせた登録用の型
@@ -140,11 +150,16 @@ export interface DocumentCreateInput {
 
 export const userApi = {
   // GET /v1/users/me
-  getMe: () =>
-    apiClient.get<UserMe>("/v1/users/me"),
+  getMe: () => apiClient.get<UserMe>("/v1/users/me"),
   // PATCH /v1/users/me
-  updateMe: (body: Partial<Pick<UserMe, "display_name" | "remind_days_before">>) =>
-    apiClient.patch<UserMe>("/v1/users/me", body),
+  updateMe: (
+    body: Partial<
+      Pick<
+        UserMe,
+        "display_name" | "remind_days_before" | "email_notify_enabled"
+      >
+    >,
+  ) => apiClient.patch<UserMe>("/v1/users/me", body),
 };
 
 // ===== 書類 =====
@@ -156,8 +171,7 @@ export const documentApi = {
       .get<{ documents: Document[] }>(`/v1/groups/${groupId}/documents`)
       .then((res) => res.documents),
   // GET /v1/documents/:id
-  get: (id: string) =>
-    apiClient.get<Document>("/v1/documents/" + id),
+  get: (id: string) => apiClient.get<Document>("/v1/documents/" + id),
   // POST /v1/documents
   create: (body: DocumentCreateInput) =>
     apiClient.post<Document>("/v1/documents", body),
@@ -165,19 +179,23 @@ export const documentApi = {
   update: (id: string, body: Partial<Document>) =>
     apiClient.patch<Document>("/v1/documents/" + id, body),
   // DELETE /v1/documents/:id
-  delete: (id: string) =>
-    apiClient.delete<void>("/v1/documents/" + id),
+  delete: (id: string) => apiClient.delete<void>("/v1/documents/" + id),
   // POST /v1/documents/scan
   scan: (formData: FormData) =>
-    apiClient.postForm<{ title: string; category: string | null; deadline: string | null; has_deadline: boolean; image_url: string }>("/v1/documents/scan", formData),
+    apiClient.postForm<{
+      title: string;
+      category: string | null;
+      deadline: string | null;
+      has_deadline: boolean;
+      image_url: string;
+    }>("/v1/documents/scan", formData),
 };
 
 // ===== 通知 =====
 
 export const notificationApi = {
   // GET /v1/notifications
-  list: () =>
-    apiClient.get<AppNotification[]>("/v1/notifications"),
+  list: () => apiClient.get<AppNotification[]>("/v1/notifications"),
   // PATCH /v1/notifications/:id/read
   markRead: (id: string) =>
     apiClient.patch<void>("/v1/notifications/" + id + "/read"),
@@ -187,22 +205,18 @@ export const notificationApi = {
 
 export const categoryApi = {
   // GET /v1/categories
-  list: () =>
-    apiClient.get<Category[]>("/v1/categories"),
+  list: () => apiClient.get<Category[]>("/v1/categories"),
 };
 
 // ===== グループ =====
 
 export const groupApi = {
   // GET /v1/groups
-  list: () =>
-    apiClient.get<Group[]>("/v1/groups"),
+  list: () => apiClient.get<Group[]>("/v1/groups"),
   // POST /v1/groups
-  create: (name: string) =>
-    apiClient.post<Group>("/v1/groups", { name }),
+  create: (name: string) => apiClient.post<Group>("/v1/groups", { name }),
   // DELETE /v1/groups/:id
-  delete: (id: string) =>
-    apiClient.delete<void>("/v1/groups/" + id),
+  delete: (id: string) => apiClient.delete<void>("/v1/groups/" + id),
   // PATCH /v1/groups/:id
   update: (id: string, name: string) =>
     apiClient.patch<Group>("/v1/groups/" + id, { name }),
@@ -211,7 +225,9 @@ export const groupApi = {
     apiClient.get<GroupMember[]>("/v1/groups/" + id + "/members"),
   // POST /v1/groups/:id/invite
   invite: (id: string, email: string) =>
-  apiClient.post<Invitation>("/v1/groups/" + id + "/invite", { invitee_email: email }),
+    apiClient.post<Invitation>("/v1/groups/" + id + "/invite", {
+      invitee_email: email,
+    }),
   // GET /v1/groups/:id/invitations
   getInvitations: (id: string) =>
     apiClient.get<Invitation[]>("/v1/groups/" + id + "/invitations"),
@@ -233,7 +249,7 @@ export const invitationApi = {
   // POST /v1/invitations/:token/accept
   accept: (token: string) =>
     apiClient.post<{ group_id: string; status: string; message: string }>(
-      "/v1/invitations/" + token + "/accept"
+      "/v1/invitations/" + token + "/accept",
     ),
   // POST /v1/invitations/:token/reject
   reject: (token: string) =>

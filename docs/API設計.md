@@ -1,14 +1,16 @@
-# API設計書（v2.3）
+# API設計書（v2.4）
 
-データベース設計書（v1.3）および要件定義書（v7.4）との整合性を取って再設計したAPI設計書。
+データベース設計書（v1.4）および要件定義書（v7.6）との整合性を取って再設計したAPI設計書。
 
 OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイルは `backend/openapi.yaml` で管理し、本ドキュメントは概要、エンドポイント一覧、および運用ルールを示す。
 
+> **v2.4での変更点**：issue #73対応。`users.email_notify_enabled` 追加に伴い、`GET /v1/users/me` のレスポンスおよび `PATCH /v1/users/me` のリクエストに `email_notify_enabled` を追加。あわせて `PATCH /v1/users/me` の仕様を明確化（`display_name` ・ `email_notify_enabled` はいずれも任意項目で、リクエストに含まれたフィールドのみ更新する部分更新方式）。
+>
+> **v2.3での変更点**：issue #62（招待フローE2E確認）にて、招待中一覧を取得するエンドポイントが存在しないことが判明したため新規追加。また、`GroupMemberRead`（v2.2で追加予定としていた`display_name`）の実装漏れが見つかり修正された。
+>
 > **v2.2での変更点**：`users.display_name`追加に伴い、ユーザー関連エンドポイントのレスポンス・リクエストを更新。
 >
 > **v2.1での変更点（再掲）**：カテゴリAPIの仕様を変更。カテゴリは固定11種類の共通カテゴリのみで運用することとし、`POST` / `PATCH` / `DELETE /categories` を廃止。`GET /categories` のみ提供する。また `DELETE /groups/{id}` の独自エラーコード `GROUP_DELETE_CONFLICT` を追加。
->
-> **v2.3での変更点**：issue #62（招待フローE2E確認）にて、招待中一覧を取得するエンドポイントが存在しないことが判明したため新規追加。また、`GroupMemberRead`（v2.2で追加予定としていた`display_name`）の実装漏れが見つかり修正された。
 
 ---
 
@@ -37,61 +39,62 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
 
 ## 2. エンドポイント一覧
 
-### ユーザー・認証 【v2.2で変更】
+### ユーザー・認証 【v2.4で変更】
 
-| メソッド | パス | 概要 | 認証 | 備考 |
-|---|---|---|---|---|
-| POST | `/v1/auth/signup` | 新規ユーザー登録＆初期化 | 必要 | Firebase認証後、`users` 作成＆「個人グループ」を自動生成（FR-001）。**`display_name`が必須項目として追加（v2.2）。** ⚠️ 入力経路（フォーム入力かFirebaseの表示名流用か）はBE①に確認必要。 |
-| GET | `/v1/users/me` | 自身のユーザー情報取得 | 必要 | `display_name` / `plan_status` / `monthly_scan_count` / `remind_days_before` を含む（v2.2で`display_name`を追加）。 |
-| PATCH | `/v1/users/me` | プロフィール・設定更新 | 必要 | `remind_days_before` に加え、**`display_name`の変更も可能（v2.2で追加）**（UI-006）。 |
+| メソッド | パス              | 概要                     | 認証 | 備考                                                                                                                                                                                                                                                                                      |
+| -------- | ----------------- | ------------------------ | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST     | `/v1/auth/signup` | 新規ユーザー登録＆初期化 | 必要 | Firebase認証後、`users` 作成＆「個人グループ」を自動生成（FR-001）。**`display_name`が必須項目として追加（v2.2）。** ⚠️ 入力経路（フォーム入力かFirebaseの表示名流用か）はBE①に確認必要。                                                                                                 |
+| GET      | `/v1/users/me`    | 自身のユーザー情報取得   | 必要 | `display_name` / `plan_status` / `monthly_scan_count` / `remind_days_before` / **`email_notify_enabled`（v2.4で追加）** を含む。                                                                                                                                                          |
+| PATCH    | `/v1/users/me`    | プロフィール・設定更新   | 必要 | `display_name` ・ **`email_notify_enabled`（v2.4で追加）** はいずれも任意項目。**部分更新方式**：リクエストボディに含まれたフィールドのみを更新し、含まれないフィールドは現状維持する（UI-006・UI-008）。`remind_days_before` の更新は本エンドポイントでは未対応（要確認・別issue管理）。 |
 
 ### グループ・招待 【メンバー一覧のみ変更】
 
-| メソッド | パス | 概要 | 認証 | 備考 |
-|---|---|---|---|---|
-| GET | `/v1/groups` | 所属グループ一覧取得 | 必要 | 個人グループ・共有グループの両方を含む。 |
-| POST | `/v1/groups` | 共有グループの新規作成 | 必要 | 作成者は `created_by` に記録され、同時に `group_members` へ自動登録（FR-002）。 |
-| DELETE | `/v1/groups/{id}` | グループ削除 | 必要 | `created_by` のユーザーのみ実行可能。他メンバーは `403 FORBIDDEN_GROUP_ACTION`。紐づく `documents` / `categories` 等が残っており削除できない場合は `409 GROUP_DELETE_CONFLICT`。 |
-| GET | `/v1/groups/{id}/members` | グループメンバー一覧取得 | 必要 | 設定画面（UI-006-G）でのメンバー表示用。レスポンスに `email` と **`display_name`（v2.2で追加）** を含む。 |
-| POST | `/v1/groups/{id}/invite` | グループへの招待発行 | 必要 | `invitations` レコード作成＆SendGridで招待リンクを送信（FR-002）。 |
-| GET | `/v1/groups/{id}/invitations` | グループの招待中（pending）一覧取得 | 必要 | グループ管理画面（UI-006-G）の「招待中」セクション用。`status='pending'`のみを`created_at`降順で返す。グループメンバーであれば誰でも参照可（招待発行者に限定しない）。 |
-| GET | `/v1/invitations/{token}` | 招待情報の取得 | 不要 | 招待ページ表示用（招待元・グループ名の確認）。期限切れでも200を返す（期限切れ表示はFE側で`expires_at`を見て判定）。 |
-| POST | `/v1/invitations/{token}/accept` | 招待の承諾 | 必要 | `group_members` へ追加し、`status` を `accepted` へ更新。期限切れは `410 INVITATION_EXPIRED`。処理済みは `409 INVITATION_ALREADY_HANDLED`。 |
-| POST | `/v1/invitations/{token}/reject` | 招待の拒否 | 必要 | `status` を `rejected` へ更新。期限切れ・処理済みの場合のエラーはacceptと同様。 |
+| メソッド | パス                             | 概要                                | 認証 | 備考                                                                                                                                                                             |
+| -------- | -------------------------------- | ----------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET      | `/v1/groups`                     | 所属グループ一覧取得                | 必要 | 個人グループ・共有グループの両方を含む。                                                                                                                                         |
+| POST     | `/v1/groups`                     | 共有グループの新規作成              | 必要 | 作成者は `created_by` に記録され、同時に `group_members` へ自動登録（FR-002）。                                                                                                  |
+| DELETE   | `/v1/groups/{id}`                | グループ削除                        | 必要 | `created_by` のユーザーのみ実行可能。他メンバーは `403 FORBIDDEN_GROUP_ACTION`。紐づく `documents` / `categories` 等が残っており削除できない場合は `409 GROUP_DELETE_CONFLICT`。 |
+| GET      | `/v1/groups/{id}/members`        | グループメンバー一覧取得            | 必要 | 設定画面（UI-006-G）でのメンバー表示用。レスポンスに `email` と **`display_name`（v2.2で追加）** を含む。                                                                        |
+| POST     | `/v1/groups/{id}/invite`         | グループへの招待発行                | 必要 | `invitations` レコード作成＆SendGridで招待リンクを送信（FR-002）。                                                                                                               |
+| GET      | `/v1/groups/{id}/invitations`    | グループの招待中（pending）一覧取得 | 必要 | グループ管理画面（UI-006-G）の「招待中」セクション用。`status='pending'`のみを`created_at`降順で返す。グループメンバーであれば誰でも参照可（招待発行者に限定しない）。           |
+| GET      | `/v1/invitations/{token}`        | 招待情報の取得                      | 不要 | 招待ページ表示用（招待元・グループ名の確認）。期限切れでも200を返す（期限切れ表示はFE側で`expires_at`を見て判定）。                                                              |
+| POST     | `/v1/invitations/{token}/accept` | 招待の承諾                          | 必要 | `group_members` へ追加し、`status` を `accepted` へ更新。期限切れは `410 INVITATION_EXPIRED`。処理済みは `409 INVITATION_ALREADY_HANDLED`。                                      |
+| POST     | `/v1/invitations/{token}/reject` | 招待の拒否                          | 必要 | `status` を `rejected` へ更新。期限切れ・処理済みの場合のエラーはacceptと同様。                                                                                                  |
+
 > 補足：画面設計書（UI-006-G）には `GET /v1/invitations?group_id=xxx` というクエリパラメータ形式のパスが記載されていたが、他のグループ配下リソース（`members`等）と一貫性を取るため、実装は `GET /v1/groups/{id}/invitations`（パスパラメータ形式）を正とする。画面設計書側の記載修正はFE担当の更新時に合わせて反映予定。
 
 ### カテゴリ
 
-| メソッド | パス | 概要 | 認証 | 備考 |
-|---|---|---|---|---|
-| GET | `/v1/categories` | カテゴリ一覧取得 | 必要 | 固定11種類の共通カテゴリ（`group_id IS NULL`）を返す。`icon`（絵文字）を含む（FR-010）。 |
+| メソッド | パス             | 概要             | 認証 | 備考                                                                                     |
+| -------- | ---------------- | ---------------- | ---- | ---------------------------------------------------------------------------------------- |
+| GET      | `/v1/categories` | カテゴリ一覧取得 | 必要 | 固定11種類の共通カテゴリ（`group_id IS NULL`）を返す。`icon`（絵文字）を含む（FR-010）。 |
 
 > `POST` / `PATCH` / `DELETE /v1/categories` は廃止済み。カテゴリは固定運用のため、グループ管理者であっても追加・編集・削除は不可。
 
 ### 書類
 
-| メソッド | パス | 概要 | 認証 | 備考 |
-|---|---|---|---|---|
-| POST | `/v1/documents/scan` | 書類画像のアップロード＆AI解析 | 必要 | 署名付きURL発行＆OpenAI解析を実行（FR-003）。失敗時は `OPENAI_API_FAILED`（500）。フロントは空欄の確認画面を表示して手入力に誘導する。 |
-| POST | `/v1/documents` | 書類データの最終登録 | 必要 | 解析確認画面からの登録（FR-004）。カレンダー即時反映＆各グループメンバー向けの `notification_schedules` / `app_notifications` を自動生成。 |
-| GET | `/v1/documents` | 書類一覧取得 | 必要 | `has_deadline` / `category_id` / `year` / `month` 等で絞り込み可能（カレンダー同期・期限なし書類一覧の両方に対応／FR-005, FR-007）。 |
-| GET | `/v1/documents/{id}` | 書類詳細取得 | 必要 | 詳細画面（UI-005）用。 |
-| PATCH | `/v1/documents/{id}` | 書類編集 / 済スタンプON・OFF | 必要 | `is_done: true` で、関連する全ユーザーの `notification_schedules`（`status='pending'`）を `cancelled` へ一括更新（FR-006）。 |
-| DELETE | `/v1/documents/{id}` | 書類削除 | 必要 | 物理削除。関連する `notification_schedules` / `app_notifications` も連動して削除（ON DELETE CASCADE）。 |
+| メソッド | パス                 | 概要                           | 認証 | 備考                                                                                                                                       |
+| -------- | -------------------- | ------------------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST     | `/v1/documents/scan` | 書類画像のアップロード＆AI解析 | 必要 | 署名付きURL発行＆OpenAI解析を実行（FR-003）。失敗時は `OPENAI_API_FAILED`（500）。フロントは空欄の確認画面を表示して手入力に誘導する。     |
+| POST     | `/v1/documents`      | 書類データの最終登録           | 必要 | 解析確認画面からの登録（FR-004）。カレンダー即時反映＆各グループメンバー向けの `notification_schedules` / `app_notifications` を自動生成。 |
+| GET      | `/v1/documents`      | 書類一覧取得                   | 必要 | `has_deadline` / `category_id` / `year` / `month` 等で絞り込み可能（カレンダー同期・期限なし書類一覧の両方に対応／FR-005, FR-007）。       |
+| GET      | `/v1/documents/{id}` | 書類詳細取得                   | 必要 | 詳細画面（UI-005）用。                                                                                                                     |
+| PATCH    | `/v1/documents/{id}` | 書類編集 / 済スタンプON・OFF   | 必要 | `is_done: true` で、関連する全ユーザーの `notification_schedules`（`status='pending'`）を `cancelled` へ一括更新（FR-006）。               |
+| DELETE   | `/v1/documents/{id}` | 書類削除                       | 必要 | 物理削除。関連する `notification_schedules` / `app_notifications` も連動して削除（ON DELETE CASCADE）。                                    |
 
 ### アプリ内お知らせ
 
-| メソッド | パス | 概要 | 認証 | 備考 |
-|---|---|---|---|---|
-| GET | `/v1/notifications` | アプリ内お知らせ一覧取得 | 必要 | `created_at` 降順。登録した本人には自分の登録通知を表示しない（FR-009）。 |
-| PATCH | `/v1/notifications/{id}/read` | お知らせの既読化 | 必要 | 個別タップ時の既読更新用。 |
+| メソッド | パス                          | 概要                     | 認証 | 備考                                                                      |
+| -------- | ----------------------------- | ------------------------ | ---- | ------------------------------------------------------------------------- |
+| GET      | `/v1/notifications`           | アプリ内お知らせ一覧取得 | 必要 | `created_at` 降順。登録した本人には自分の登録通知を表示しない（FR-009）。 |
+| PATCH    | `/v1/notifications/{id}/read` | お知らせの既読化         | 必要 | 個別タップ時の既読更新用。                                                |
 
 ### 課金（Stripe）
 
-| メソッド | パス | 概要 | 認証 | 備考 |
-|---|---|---|---|---|
-| POST | `/v1/billing/checkout-session` | Stripe決済セッション作成 | 必要 | 月間スキャン上限超過時の有料プラン導線（FR-011）。 |
-| POST | `/v1/billing/webhook` | Stripe Webhook受信 | 不要（署名検証） | 決済完了イベントを受け、`users.plan_status` を `'premium'` 等へ更新。 |
+| メソッド | パス                           | 概要                     | 認証             | 備考                                                                  |
+| -------- | ------------------------------ | ------------------------ | ---------------- | --------------------------------------------------------------------- |
+| POST     | `/v1/billing/checkout-session` | Stripe決済セッション作成 | 必要             | 月間スキャン上限超過時の有料プラン導線（FR-011）。                    |
+| POST     | `/v1/billing/webhook`          | Stripe Webhook受信       | 不要（署名検証） | 決済完了イベントを受け、`users.plan_status` を `'premium'` 等へ更新。 |
 
 ---
 
@@ -242,7 +245,7 @@ Content-Type: application/json
 
 ---
 
-## 3.5. スキーマ定義（v2.2での変更分）
+## 3.5. スキーマ定義（v2.4での変更分）
 
 ```jsonc
 // UserRead（GET /v1/users/me）
@@ -253,7 +256,16 @@ Content-Type: application/json
   "display_name": "string",   // 【v2.2で追加】
   "plan_status": "string",
   "monthly_scan_count": "integer",
-  "remind_days_before": "integer"
+  "remind_days_before": "integer",
+  "email_notify_enabled": "boolean"   // 【v2.4で追加】true: メール+アプリ内通知 / false: アプリ内通知のみ
+}
+
+// UserUpdate（PATCH /v1/users/me のリクエストボディ）
+// 【v2.4で追加】display_name・email_notify_enabledはいずれも任意（Optional）。
+// リクエストに含まれたフィールドのみを更新する部分更新方式。
+{
+  "display_name": "string?",            // 任意。指定時は1〜50文字
+  "email_notify_enabled": "boolean?"    // 任意
 }
 
 // GroupMemberRead（GET /v1/groups/{id}/members）
@@ -293,34 +305,37 @@ Content-Type: application/json
 
 > ⚠️ 本書のエラーコード一覧表は完全版が別途存在する想定です。以下はissue #16対応で追加されたコードのみを記載しています。既存の一覧表に追記してください。
 
-| コード | HTTPステータス | 説明 |
-|---|---|---|
-| `UNAUTHORIZED` | 401 | Firebase IDトークンが無効、期限切れ、または未設定。 |
-| `FORBIDDEN_GROUP_ACTION` | 403 | 作成者（`created_by`）以外によるグループ削除操作、または共通カテゴリの編集・削除操作。グループ管理者限定操作の試行も含む。 |
-| `GROUP_DELETE_CONFLICT` | 409 | グループに紐づく `documents` 等が残っており削除できない |
-| `RESOURCE_NOT_FOUND` | 404 | 指定された書類（`document_id`）、グループ、カテゴリ、招待等が存在しない。 |
-| `INVITATION_EXPIRED` | 410 | `invitations.expires_at` を過ぎた招待トークンへのアクセス。 |
-| `INVITATION_ALREADY_HANDLED` | 409 | 既に承諾・拒否済みの招待への再操作 |
-| `SCAN_LIMIT_EXCEEDED` | 422 | 当月の無料スキャン上限（`monthly_scan_count`）を超過（Stripeへの導線トリガー）。 |
-| `OPENAI_API_FAILED` | 500 | OpenAI APIのエラーが指数バックオフ（最大3回リトライ）後も解消しなかった場合。 |
+| コード                       | HTTPステータス | 説明                                                                                                                       |
+| ---------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `UNAUTHORIZED`               | 401            | Firebase IDトークンが無効、期限切れ、または未設定。                                                                        |
+| `FORBIDDEN_GROUP_ACTION`     | 403            | 作成者（`created_by`）以外によるグループ削除操作、または共通カテゴリの編集・削除操作。グループ管理者限定操作の試行も含む。 |
+| `GROUP_DELETE_CONFLICT`      | 409            | グループに紐づく `documents` 等が残っており削除できない                                                                    |
+| `RESOURCE_NOT_FOUND`         | 404            | 指定された書類（`document_id`）、グループ、カテゴリ、招待等が存在しない。                                                  |
+| `INVITATION_EXPIRED`         | 410            | `invitations.expires_at` を過ぎた招待トークンへのアクセス。                                                                |
+| `INVITATION_ALREADY_HANDLED` | 409            | 既に承諾・拒否済みの招待への再操作                                                                                         |
+| `SCAN_LIMIT_EXCEEDED`        | 422            | 当月の無料スキャン上限（`monthly_scan_count`）を超過（Stripeへの導線トリガー）。                                           |
+| `OPENAI_API_FAILED`          | 500            | OpenAI APIのエラーが指数バックオフ（最大3回リトライ）後も解消しなかった場合。                                              |
 
 ---
 
 ## 5. レート制限・冪等性
 
 ### レート制限の方針
+
 - 一般的なAPIエンドポイント（GETなど）は、Redisを用いてユーザー（`firebase_uid`）あたり **1分間に最大120リクエスト** に制限する。
 - AI解析エンドポイント（`POST /v1/documents/scan`）は、OpenAI APIの負荷およびコスト管理の観点から、**1分間に最大5リクエスト** の厳格な制限を設ける。
 
 ### POST / PATCH に対する冪等性の扱い
+
 - **書類登録（`POST /v1/documents`）**：モバイル通信の瞬断等による重複登録を防ぐため、フロントエンドは画面遷移時に生成した一意のUUIDをヘッダー `X-Idempotency-Key` に付与して送信することを推奨とする。バックエンドは同一キーによる2重リクエストを検知した場合、初回と同じレスポンス（201）を即座に返却する。
 - **済スタンプ等のPATCHリクエスト**：状態の「上書き」であるため冪等キーは不要（何度リクエストしても最終的な状態は変わらないため）。
 - **Stripe Webhook（`POST /v1/billing/webhook`）**：Stripeが送信する `event.id` を用いて重複イベント処理を防止する（同一イベントの再送に対して二重課金処理が起きないようにする）。
 
 ---
 
-## 既知の課題（v2.3時点）
+## 既知の課題（v2.4時点）
 
-| 項目 | 内容 |
-|---|---|
-| 招待受諾時の本人確認の欠落 | `POST /v1/invitations/{token}/accept` は、トークンの有効性のみを検証し、「ログイン中のユーザーのメールアドレス」と「`invitations.invitee_email`」の一致確認を行っていない。トークンを知っている任意のユーザーが参加できてしまう。issue化済み（要対応）。 |
+| 項目                                    | 内容                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 招待受諾時の本人確認の欠落              | `POST /v1/invitations/{token}/accept` は、トークンの有効性のみを検証し、「ログイン中のユーザーのメールアドレス」と「`invitations.invitee_email`」の一致確認を行っていない。トークンを知っている任意のユーザーが参加できてしまう。issue化済み（要対応）。                                                                                                                                 |
+| `remind_days_before` の更新手段が未確認 | 設定画面（UI-006）には「期限の[N]日前にメール送信」という日数入力欄が存在し、画面設計書・要件定義書では `PATCH /v1/users/me` での更新を想定する記載がある。しかし issue #73 時点のバックエンド実装（`UserUpdate`）では `display_name` ・ `email_notify_enabled` のみが受け付け可能で、`remind_days_before` の更新ロジックが存在しない。意図的な未実装か実装漏れか要確認（issue化検討）。 |
