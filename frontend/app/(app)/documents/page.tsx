@@ -1,56 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DocumentCard } from "@/components/calendar/DocumentCard";
+import { groupApi, documentApi, categoryApi, Document, Category } from "@/lib/api";
 
-// モックデータ（Week2でGET /v1/documents?group_id=xxx に差し替え）
-const MOCK_DOCUMENTS = [
-  {
-    id: "doc-001",
-    title: "夏期講習 申込書",
-    categoryName: "学校",
-    createdByName: "花子",
-    deadlineDate: "2026-06-28",
-    hasDeadline: true,
-    isDone: false,
-  },
-  {
-    id: "doc-002",
-    title: "PTA会費 納入のお知らせ",
-    categoryName: "仕事",
-    createdByName: "花子",
-    deadlineDate: "2026-06-30",
-    hasDeadline: true,
-    isDone: false,
-  },
-  {
-    id: "doc-003",
-    title: "定期健康診断のご案内",
-    categoryName: "医療",
-    createdByName: "太郎",
-    deadlineDate: "2026-06-24",
-    hasDeadline: true,
-    isDone: true,
-  },
-  {
-    id: "doc-004",
-    title: "生命保険 更新案内",
-    categoryName: "保険",
-    createdByName: "太郎",
-    deadlineDate: undefined,
-    hasDeadline: false,
-    isDone: false,
-  },
-  {
-    id: "doc-005",
-    title: "固定資産税 納付書",
-    categoryName: "税金",
-    createdByName: "太郎",
-    deadlineDate: undefined,
-    hasDeadline: false,
-    isDone: false,
-  },
-];
+interface DisplayDocument {
+  id: string;
+  title: string;
+  categoryName?: string;
+  categoryIcon?: string;
+  deadlineDate?: string;
+  hasDeadline: boolean;
+  isDone: boolean;
+}
 
 const CATEGORY_PILLS = [
   { label: "すべて", value: "all" },
@@ -70,14 +32,66 @@ const CATEGORY_PILLS = [
 
 export default function DocumentsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [documents, setDocuments] = useState<DisplayDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setIsLoading(true);
+      setHasError(false);
+      try {
+        const [groups, categories] = await Promise.all([
+          groupApi.list(),
+          categoryApi.list(),
+        ]);
+
+        const categoryIconById = new Map<string, string>(
+          categories.map((c: Category) => [c.id, c.icon ?? "📄"])
+        );
+
+        // 所属する全グループの書類一覧をまとめて取得し合算する
+        // （カレンダー画面 UI-002 と同じ取得パターン）
+        const docsByGroup = await Promise.all(
+          groups.map((g) => documentApi.list(g.id))
+        );
+
+        const allDocs: DisplayDocument[] = docsByGroup.flat().map((d: Document) => ({
+          id: d.id,
+          title: d.title ?? "(無題)",
+          categoryName: d.categoryName ?? undefined,
+          categoryIcon: d.category_id ? categoryIconById.get(d.category_id) : undefined,
+          deadlineDate: d.deadline_date ?? undefined,
+          hasDeadline: d.has_deadline,
+          isDone: d.is_done,
+        }));
+
+        if (!cancelled) setDocuments(allDocs);
+      } catch (e) {
+        if (!cancelled) {
+          setDocuments([]);
+          setHasError(true);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
-    if (selectedCategory === "all") return MOCK_DOCUMENTS;
+    if (selectedCategory === "all") return documents;
     if (selectedCategory === "no-deadline") {
-      return MOCK_DOCUMENTS.filter((d) => !d.hasDeadline);
+      return documents.filter((d) => !d.hasDeadline);
     }
-    return MOCK_DOCUMENTS.filter((d) => d.categoryName === selectedCategory);
-  }, [selectedCategory]);
+    return documents.filter((d) => d.categoryName === selectedCategory);
+  }, [documents, selectedCategory]);
 
   const withDeadline = filtered.filter((d) => d.hasDeadline && !d.isDone);
   const noDeadline = filtered.filter((d) => !d.hasDeadline && !d.isDone);
@@ -109,48 +123,76 @@ export default function DocumentsPage() {
       </div>
 
       <div className="px-4 pt-4 pb-8">
-        {/* 件数 */}
-        <p className="text-xs text-[#8fa09e] mb-4">{filtered.length}件</p>
-
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-3 pt-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-16 rounded-2xl animate-pulse"
+                style={{ backgroundColor: "#e5e7eb" }}
+              />
+            ))}
+          </div>
+        ) : hasError ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-[#8fa09e]">
-            <svg className="w-12 h-12 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-            </svg>
-            <p className="text-sm">書類がありません</p>
+            <p className="text-sm">書類の取得に失敗しました</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* 期限あり */}
-            {withDeadline.length > 0 && (
-              <section>
-                <p className="text-xs text-[#8fa09e] mb-2">期限あり</p>
-                {withDeadline.map((doc) => (
-                  <DocumentCard key={doc.id} {...doc} />
-                ))}
-              </section>
-            )}
+          <>
+            {/* 件数 */}
+            <p className="text-xs text-[#8fa09e] mb-4">{filtered.length}件</p>
 
-            {/* 期限なし・保管 */}
-            {noDeadline.length > 0 && (
-              <section>
-                <p className="text-xs text-[#8fa09e] mb-2">期限なし・保管</p>
-                {noDeadline.map((doc) => (
-                  <DocumentCard key={doc.id} {...doc} />
-                ))}
-              </section>
-            )}
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3 text-[#8fa09e]">
+                <svg
+                  className="w-12 h-12 opacity-40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+                  />
+                </svg>
+                <p className="text-sm">書類がありません</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* 期限あり */}
+                {withDeadline.length > 0 && (
+                  <section>
+                    <p className="text-xs text-[#8fa09e] mb-2">期限あり</p>
+                    {withDeadline.map((doc) => (
+                      <DocumentCard key={doc.id} {...doc} />
+                    ))}
+                  </section>
+                )}
 
-            {/* 完了済み */}
-            {done.length > 0 && (
-              <section>
-                <p className="text-xs text-[#8fa09e] mb-2">完了済み</p>
-                {done.map((doc) => (
-                  <DocumentCard key={doc.id} {...doc} />
-                ))}
-              </section>
+                {/* 期限なし・保管 */}
+                {noDeadline.length > 0 && (
+                  <section>
+                    <p className="text-xs text-[#8fa09e] mb-2">期限なし・保管</p>
+                    {noDeadline.map((doc) => (
+                      <DocumentCard key={doc.id} {...doc} />
+                    ))}
+                  </section>
+                )}
+
+                {/* 完了済み */}
+                {done.length > 0 && (
+                  <section>
+                    <p className="text-xs text-[#8fa09e] mb-2">完了済み</p>
+                    {done.map((doc) => (
+                      <DocumentCard key={doc.id} {...doc} />
+                    ))}
+                  </section>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>
