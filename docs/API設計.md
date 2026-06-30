@@ -73,14 +73,14 @@ OpenAPI（Swagger）に準拠した形式で記述する。スキーマファイ
 
 ### 書類
 
-| メソッド | パス                 | 概要                           | 認証 | 備考                                                                                                                                       |
-| -------- | -------------------- | ------------------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| POST     | `/v1/documents/scan` | 書類画像のアップロード＆AI解析 | 必要 | 署名付きURL発行＆OpenAI解析を実行（FR-003）。失敗時は `OPENAI_API_FAILED`（500）。フロントは空欄の確認画面を表示して手入力に誘導する。     |
-| POST     | `/v1/documents`      | 書類データの最終登録           | 必要 | 解析確認画面からの登録（FR-004）。カレンダー即時反映＆各グループメンバー向けの `notification_schedules` / `app_notifications` を自動生成。 |
-| GET      | `/v1/documents`      | 書類一覧取得                   | 必要 | `has_deadline` / `category_id` / `year` / `month` 等で絞り込み可能（カレンダー同期・期限なし書類一覧の両方に対応／FR-005, FR-007）。       |
-| GET      | `/v1/documents/{id}` | 書類詳細取得                   | 必要 | 詳細画面（UI-005）用。                                                                                                                     |
-| PATCH    | `/v1/documents/{id}` | 書類編集 / 済スタンプON・OFF   | 必要 | `is_done: true` で、関連する全ユーザーの `notification_schedules`（`status='pending'`）を `cancelled` へ一括更新（FR-006）。               |
-| DELETE   | `/v1/documents/{id}` | 書類削除                       | 必要 | 物理削除。関連する `notification_schedules` / `app_notifications` も連動して削除（ON DELETE CASCADE）。                                    |
+| メソッド | パス | 概要 | 認証 | 備考 |
+|---|---|---|---|---|
+| POST | `/v1/documents/scan` | 書類画像のアップロード＆AI解析 | 必要 | 署名付きURL発行＆OpenAI解析を実行（FR-003）。失敗時は `OPENAI_API_FAILED`（500）。フロントは空欄の確認画面を表示して手入力に誘導する。 |
+| POST | `/v1/documents` | 書類データの最終登録 | 必要 | 解析確認画面からの登録（FR-004）。カレンダー即時反映＆各グループメンバー向けの `notification_schedules` / `app_notifications` を自動生成。 |
+| GET | `/v1/groups/{group_id}/documents` | 書類一覧取得 | 必要 | パスパラメータで対象グループを指定。`category_id` / `has_deadline` をクエリパラメータで指定すると絞り込み可能（issue #54：カレンダー同期・期限なし書類一覧・UI-007の絞り込みpillに対応／FR-005, FR-007）。レスポンスは `{ documents: Document[] }` 形式で、各 `Document` にはカテゴリ名を解決済みの `categoryName` を含む。 |
+| GET | `/v1/documents/{id}` | 書類詳細取得 | 必要 | 詳細画面（UI-005）用。 |
+| PATCH | `/v1/documents/{id}` | 書類編集 / 済スタンプON・OFF | 必要 | `is_done: true` で、関連する全ユーザーの `notification_schedules`（`status='pending'`）を `cancelled` へ一括更新（FR-006）。 |
+| DELETE | `/v1/documents/{id}` | 書類削除 | 必要 | 物理削除。関連する `notification_schedules` / `app_notifications` も連動して削除（ON DELETE CASCADE）。 |
 
 ### アプリ内お知らせ
 
@@ -285,17 +285,6 @@ Content-Type: application/json
   "name": "string",
   "color_code": "string | null",
   "icon": "string | null"
-}
-
-// InvitationRead（POST /v1/groups/{id}/invite のレスポンス、および GET /v1/groups/{id}/invitations の各要素）
-{
-  "id": "uuid",
-  "group_id": "uuid",
-  "invited_by": "uuid",
-  "invitee_email": "string",
-  "status": "pending | accepted | rejected",
-  "created_at": "datetime",
-  "expires_at": "datetime"
 }
 ```
 
