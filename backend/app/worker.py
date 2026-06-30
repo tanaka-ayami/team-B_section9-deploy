@@ -35,6 +35,14 @@ def send_due_reminders(self):
     """
     notification_schedules を確認し、送信時刻になった予約のリマインドメールを送る。
     Celery Beat により定期的に実行される。
+
+    status の取りうる値：
+      - pending   : 未送信（待機中）
+      - sent      : 送信成功
+      - failed    : 送信を試みたが3回失敗した
+      - cancelled : 済スタンプ・書類削除等によりユーザー操作でキャンセルされた
+      - skipped   : 【issue #73追加】ユーザーがメール通知をOFFにしているため、
+                    意図的に送信しなかった（sent/failedとは区別する）
     """
     from datetime import datetime
     from app.db.base import SessionLocal
@@ -63,6 +71,13 @@ def send_due_reminders(self):
             if user is None or document is None:
                 # 対象データが既に削除されている場合は送信せずキャンセル扱いにする
                 schedule.status = "cancelled"
+                db.commit()
+                continue
+
+            # 【issue #73追加】メール通知をOFFにしているユーザーには送信しない。
+            # アプリ内お知らせとは独立した設定であり、こちらはメールリマインドのみが対象。
+            if not user.email_notify_enabled:
+                schedule.status = "skipped"
                 db.commit()
                 continue
 
