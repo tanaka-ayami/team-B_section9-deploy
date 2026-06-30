@@ -113,11 +113,13 @@ export default function InvitationPage() {
         {!user ? (
           <div className="space-y-3">
             <p className="text-xs text-[#8fa09e]">
-              参加するには、ログインまたは新規登録が必要です。ログイン後、もう一度このリンクを開いてください。
+              参加するには、ログインまたは新規登録が必要です。ログイン後、自動でこのページに戻ります。
             </p>
             <button
               type="button"
-              onClick={() => router.push("/login")}
+              onClick={() =>
+                router.push(`/login?redirect=${encodeURIComponent(`/invitations/${token}`)}`)
+              }
               className="w-full py-3 rounded-xl text-sm font-semibold text-white"
               style={{ backgroundColor: "#557C79" }}
             >
