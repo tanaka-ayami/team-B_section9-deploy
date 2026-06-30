@@ -255,3 +255,11 @@ export const invitationApi = {
   reject: (token: string) =>
     apiClient.post<{ status: string }>("/v1/invitations/" + token + "/reject"),
 };
+
+// ===== 課金 =====
+
+export const billingApi = {
+  // POST /v1/billing/checkout-session
+  createCheckoutSession: () =>
+    apiClient.post<{ checkout_url: string }>("/v1/billing/checkout-session"),
+};
