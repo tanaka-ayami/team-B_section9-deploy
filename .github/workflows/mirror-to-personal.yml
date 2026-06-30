@@ -1,0 +1,22 @@
+name: Mirror to personal repo for Vercel
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - develop
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false   # ← この行を追加
+
+      - name: Push to personal repo
+        run: |
+          git remote add personal https://tanaka-ayami:${{ secrets.PERSONAL_REPO_TOKEN }}@github.com/tanaka-ayami/team-B_section9-deploy.git
+          git push personal ${{ github.ref_name }}:${{ github.ref_name }} --force
