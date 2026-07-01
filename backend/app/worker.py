@@ -34,6 +34,7 @@ celery.conf.beat_schedule = {
 def send_due_reminders(self):
     """
     notification_schedules を確認し、送信時刻になった予約のリマインドメールを送る。
+    あわせて、グループの全メンバーに期限前のベルマーク通知（app_notifications）を作成する。
     Celery Beat により定期的に実行される。
 
     status の取りうる値：
@@ -43,12 +44,20 @@ def send_due_reminders(self):
       - cancelled : 済スタンプ・書類削除等によりユーザー操作でキャンセルされた
       - skipped   : 【issue #73追加】ユーザーがメール通知をOFFにしているため、
                     意図的に送信しなかった（sent/failedとは区別する）
+
+    ベルマーク通知（app_notifications）について：
+      - メール通知の送受信結果（sent/skipped）に関わらず、全メンバーに通知を作成する
+        （アプリ内通知は email_notify_enabled の設定に関わらず常時ON）
+      - triggered_by には書類の登録者（document.created_by）を使用する
+        （システム自動発生の通知のため、操作ユーザーは存在しない）
+      - 重複防止：notification_schedules の status が pending から変わるタイミングで
+        1回だけ作成するため、同じ書類について複数回通知が発生しない
     """
     from datetime import datetime
     from app.db.base import SessionLocal
-    from app.models.notification import NotificationSchedule
+    from app.models.notification import AppNotification, NotificationSchedule
     from app.models.document import Document
-    from app.models.user import User
+    from app.models.user import GroupMember, User
     from app.services.sendgrid_service import send_reminder_email
 
     db = SessionLocal()
@@ -78,26 +87,47 @@ def send_due_reminders(self):
             # アプリ内お知らせとは独立した設定であり、こちらはメールリマインドのみが対象。
             if not user.email_notify_enabled:
                 schedule.status = "skipped"
-                db.commit()
-                continue
-
-            deadline_str = (
-                document.deadline_date.isoformat() if document.deadline_date else "未設定"
-            )
-
-            success = send_reminder_email(
-                to_email=user.email,
-                document_title=document.title or "（無題の書類）",
-                deadline_date=deadline_str,
-            )
-
-            if success:
-                schedule.status = "sent"
             else:
-                schedule.retry_count += 1
-                if schedule.retry_count >= 3:
-                    schedule.status = "failed"
-                # 3回未満ならstatusはpendingのまま → 次回のBeat実行時に再試行される
+                deadline_str = (
+                    document.deadline_date.isoformat() if document.deadline_date else "未設定"
+                )
+
+                success = send_reminder_email(
+                    to_email=user.email,
+                    document_title=document.title or "（無題の書類）",
+                    deadline_date=deadline_str,
+                )
+
+                if success:
+                    schedule.status = "sent"
+                else:
+                    schedule.retry_count += 1
+                    if schedule.retry_count >= 3:
+                        schedule.status = "failed"
+                    # 3回未満ならstatusはpendingのまま → 次回のBeat実行時に再試行される
+
+            # 【issue #83追加】期限前ベルマーク通知を全グループメンバーに作成する。
+            # メール送信の成否・email_notify_enabledの設定に関わらず全員に届ける。
+            # statusがpendingから変わるタイミングで1回だけ作成し、重複を防ぐ。
+            if schedule.status != "pending":
+                title = document.title or "（無題の書類）"
+                message = f"「{title}」の期限が近づいています"
+
+                group_members = (
+                    db.query(GroupMember)
+                    .filter(GroupMember.group_id == document.group_id)
+                    .all()
+                )
+
+                for member in group_members:
+                    notification = AppNotification(
+                        group_id=document.group_id,
+                        triggered_by=document.created_by,
+                        user_id=member.user_id,
+                        document_id=document.id,
+                        message=message,
+                    )
+                    db.add(notification)
 
             db.commit()
 
