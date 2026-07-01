@@ -14,4 +14,4 @@ pydantic-settings
 pytest
 httpx
 sendgrid
-
+stripe

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { groupApi, userApi, Group, UserMe } from "@/lib/api";
+import { groupApi, userApi, billingApi, Group, UserMe } from "@/lib/api";
 
 // プランの上限（30枚）はAPIから取得できないため引き続きフロント側の固定値とする
 const PLAN_LIMIT = 30;
@@ -94,8 +94,14 @@ export default function SettingsPage() {
           {/* Stripeボタン */}
           <button
             type="button"
-            onClick={() => {
-              // issue #22でPOST /v1/billing/checkout-session に差し替え（バックエンド未実装のため保留）
+            onClick={async () => {
+              try {
+                const { checkout_url } =
+                  await billingApi.createCheckoutSession();
+                window.location.href = checkout_url;
+              } catch (e) {
+                alert("決済ページの取得に失敗しました。再度お試しください。");
+              }
             }}
             className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2"
             style={{ backgroundColor: "#D45D1E" }}
