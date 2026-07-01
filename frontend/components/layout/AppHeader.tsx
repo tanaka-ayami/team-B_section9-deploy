@@ -14,12 +14,12 @@ export function AppHeader({
   onBellClick,
 }: AppHeaderProps) {
   return (
-    <header className="px-4 pt-12 pb-4 bg-[#557C79]">
+    <header className="px-4 pt-4 pb-4 bg-[#557C79]">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-medium text-white leading-tight">
-            プリント管理
-          </h1>
+          <h1 className="text-xl font-medium text-white leading-tight tracking-wider">
+            Scanly
+        </h1>
           {(groupName || yearMonth) && (
             <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.75)" }}>
               {[groupName, yearMonth].filter(Boolean).join("・")}
