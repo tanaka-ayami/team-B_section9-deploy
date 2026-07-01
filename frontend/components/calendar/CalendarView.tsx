@@ -112,10 +112,14 @@ export function CalendarView({
 }
         .fc .fc-event-title  { font-size: 0.6rem !important; color: inherit !important; }
         .fc .fc-daygrid-event-dot { display: none !important; }
-        .fc .fc-event.fc-event-today  { background-color: #D45D1E !important; color: #fff !important; font-weight: 600 !important; }
-        .fc .fc-event.fc-event-urgent { background-color: #FADDCC !important; color: #B84A18 !important; font-weight: 600 !important; }
-        .fc .fc-event.fc-event-normal { background-color: #9BBFAA !important; color: #1e4d3a !important; }
+        .fc .fc-event.fc-event-today  { background-color: #D45D1E !important; color: #fff !important; font-weight: 400 !important; }
+        .fc .fc-event.fc-event-today .fc-event-main { color: #fff !important; }
+        .fc .fc-event.fc-event-urgent { background-color: #F5C29B !important; color: #6B2508 !important; font-weight: 500 !important; }
+        .fc .fc-event.fc-event-urgent .fc-event-main { color: #6B2508 !important; }
+        .fc .fc-event.fc-event-normal { background-color: #ADCFBA !important; color: #143d2e !important; font-weight: 500 !important; }
+        .fc .fc-event.fc-event-normal .fc-event-main { color: #143d2e !important; }
         .fc .fc-event.fc-event-done   { background-color: #C0C0C0 !important; color: #555 !important; }
+        .fc .fc-event.fc-event-done .fc-event-main { color: #555 !important; }
         `}</style>  
         <FullCalendar
         plugins={[dayGridPlugin]}

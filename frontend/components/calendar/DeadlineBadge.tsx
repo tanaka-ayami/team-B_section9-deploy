@@ -16,14 +16,11 @@ function getVariant(deadlineDate: string, isDone: boolean): BadgeVariant {
   return "normal";
 }
 
-const STYLES: Record <
-  BadgeVariant,
-  { label: (diff: number) => string; style: React.CSSProperties }
-> = {
+const STYLES: Record<BadgeVariant, { label: (diff: number) => string; style: React.CSSProperties }> = {
   today:  { label: () => "今日！",       style: { backgroundColor: "#D45D1E", color: "#fff",     fontWeight: 600 } },
-  urgent: { label: (d) => `あと${d}日`, style: { backgroundColor: "#FADDCC", color: "#D45D1E"} },
-  normal: { label: (d) => `あと${d}日`, style: { backgroundColor: "#ADCFBA", color: "#2d5a4e" } },
-  done:   { label: () => "✓ 済",         style: { backgroundColor: "#e8e8e8", color: "#aaa",     textDecoration: "line-through" } },
+  urgent: { label: (d) => `あと${d}日`, style: { backgroundColor: "#F5C29B", color: "#8A3510"} },
+  normal: { label: (d) => `あと${d}日`, style: { backgroundColor: "#9BBFAA", color: "#1e4d3a" } },
+  done:   { label: () => "✓ 済",         style: { backgroundColor: "#C0C0C0", color: "#555",     textDecoration: "line-through" } },
 };
 
 export function DeadlineBadge({ deadlineDate, isDone }: DeadlineBadgeProps) {
