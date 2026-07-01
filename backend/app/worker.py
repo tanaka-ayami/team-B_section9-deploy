@@ -106,9 +106,11 @@ def send_due_reminders(self):
                         schedule.status = "failed"
                     # 3回未満ならstatusはpendingのまま → 次回のBeat実行時に再試行される
 
-            # 【issue #83追加】期限前ベルマーク通知を全グループメンバーに作成する。
+            # 【issue #XX追加】期限前ベルマーク通知を全グループメンバーに作成する。
             # メール送信の成否・email_notify_enabledの設定に関わらず全員に届ける。
-            # statusがpendingから変わるタイミングで1回だけ作成し、重複を防ぐ。
+            # statusがpendingから変わるタイミングで作成するが、グループメンバー数分の
+            # notification_schedulesが存在する場合、各スケジュール処理のたびに全員分を
+            # 作成すると重複が発生するため、作成前に存在確認を行う（冪等性の担保）。
             if schedule.status != "pending":
                 title = document.title or "（無題の書類）"
                 message = f"「{title}」の期限が近づいています"
@@ -120,6 +122,18 @@ def send_due_reminders(self):
                 )
 
                 for member in group_members:
+                    already_exists = (
+                        db.query(AppNotification)
+                        .filter(
+                            AppNotification.document_id == document.id,
+                            AppNotification.user_id == member.user_id,
+                            AppNotification.message == message,
+                        )
+                        .first()
+                    )
+                    if already_exists:
+                        continue
+
                     notification = AppNotification(
                         group_id=document.group_id,
                         triggered_by=document.created_by,
