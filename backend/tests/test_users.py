@@ -21,6 +21,7 @@ class _FakeUser:
     plan_status = "free"
     monthly_scan_count = 0
     remind_days_before = 3
+    email_notify_enabled = True
     
 
 
