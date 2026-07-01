@@ -35,3 +35,4 @@ services:
     name: team-b-redis
     plan: free
     maxmemoryPolicy: noeviction
+    ipAllowList: []
