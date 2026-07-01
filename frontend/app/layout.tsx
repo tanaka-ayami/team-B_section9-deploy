@@ -9,7 +9,7 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "プリント管理",
+  title: "Scanly",
   description: "書類をスキャンして、家族と共有",
 };
 
