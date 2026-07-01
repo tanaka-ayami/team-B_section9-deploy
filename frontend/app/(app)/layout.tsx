@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -30,6 +30,8 @@ function toDrawerNotification(n: AppNotification): DrawerNotification {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const isFullscreen = pathname === "/scan";
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<DrawerNotification[]>([]);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -88,6 +90,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       );
     });
   };
+
+  if (isFullscreen) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-screen">
