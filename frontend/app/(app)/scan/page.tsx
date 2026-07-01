@@ -39,7 +39,7 @@ export default function ScanPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#1a1a1a" }}>
+    <div className="h-dvh flex flex-col overflow-hidden" style={{ backgroundColor: "#1a1a1a" }}>
       {/* ローディングオーバーレイ */}
       {isAnalyzing && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
@@ -69,7 +69,7 @@ export default function ScanPage() {
 
       {/* カメラプレビューエリア */}
       <div className="flex-1 flex items-center justify-center mx-4 rounded-2xl overflow-hidden"
-        style={{ backgroundColor: "#2a2a2a", minHeight: "50vh" }}>
+        style={{ backgroundColor: "#2a2a2a" }}>
         <div className="text-center">
           <div className="relative w-48 h-64 mx-auto">
             <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white rounded-tl"/>
@@ -86,7 +86,7 @@ export default function ScanPage() {
       </div>
 
       {/* ボタンエリア */}
-      <div className="flex items-center justify-center gap-8 px-4 py-8">
+      <div className="flex items-center justify-center gap-6 px-4 py-4">
         {/* ライブラリ */}
         <button
           type="button"
@@ -112,7 +112,7 @@ export default function ScanPage() {
         <div className="w-14 h-14"/>
       </div>
 
-      <p className="text-center text-xs pb-8 opacity-50 text-white">
+      <p className="text-center text-xs pb-4 opacity-50 text-white">
         ライブラリから書類を選択できます
       </p>
 
