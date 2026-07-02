@@ -1,3 +1,4 @@
+// frontend/app/(app)/layout.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -8,7 +9,6 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { NotificationDrawer } from "@/components/layout/NotificationDrawer";
 import { notificationApi, AppNotification } from "@/lib/api";
 
-// NotificationDrawerが期待する形に変換する（バックエンドのAppNotificationとは少し項目名が違う）
 interface DrawerNotification {
   id: string;
   message: string;
@@ -21,7 +21,7 @@ function toDrawerNotification(n: AppNotification): DrawerNotification {
   return {
     id: n.id,
     message: n.message,
-    documentTitle: "", // バックエンドのレスポンスにはdocument_idしか無いため、現時点では空欄
+    documentTitle: "",
     isRead: n.is_read,
     createdAt: n.created_at,
   };
@@ -32,6 +32,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const isFullscreen = pathname === "/scan";
+  // 共通ヘッダー（Scanly ロゴ＋ベルマーク）を表示するのは、ボトムナビの3つのトップ画面のみ。
+  // それ以外（詳細・編集・確認・新規作成などの下層ページ）は自前のヘッダー（戻る＋タイトル）を持つため、
+  // 共通ヘッダーは非表示にする。
+  const topLevelPaths = ["/calendar", "/documents", "/settings"];
+  const hasOwnHeader = !isFullscreen && !topLevelPaths.includes(pathname);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<DrawerNotification[]>([]);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -42,7 +47,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, router]);
 
-  // ログイン済みになったら通知一覧を取得する
   useEffect(() => {
     if (!loading && user) {
       notificationApi
@@ -79,12 +83,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const handleNotificationRead = (id: string) => {
-    // 画面側は即時反映（楽観的更新）し、APIへの反映は裏側で行う
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
     );
     notificationApi.markRead(id).catch(() => {
-      // 失敗した場合は既読状態を元に戻す
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: false } : n)),
       );
@@ -97,10 +99,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-screen">
-      <AppHeader
-        unreadCount={unreadCount}
-        onBellClick={() => setDrawerOpen(true)}
-      />
+      {!hasOwnHeader && (
+        <AppHeader
+          unreadCount={unreadCount}
+          onBellClick={() => setDrawerOpen(true)}
+        />
+      )}
       <main className="flex-1 pb-24">{children}</main>
       <BottomNav />
       <NotificationDrawer

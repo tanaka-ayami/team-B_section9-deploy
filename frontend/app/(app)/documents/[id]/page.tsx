@@ -17,6 +17,7 @@ export default function DocumentDetailPage() {
   const [reminderCancelled, setReminderCancelled] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   function showToast(message: string) {
     setToast(message);
@@ -66,6 +67,16 @@ export default function DocumentDetailPage() {
     }
     setShowDeleteDialog(false);
   }
+
+  // ESCキーで画像モーダルを閉じる
+  useEffect(() => {
+    if (!showImageModal) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowImageModal(false);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showImageModal]);
 
   if (loading) {
     return (
@@ -121,16 +132,18 @@ export default function DocumentDetailPage() {
         <button
           type="button"
           className="text-white text-xs border border-white/50 rounded-full px-3 py-1"
-          onClick={() => showToast("再編集は別途対応予定です")}
+          onClick={() => router.push(`/documents/${id}/edit`)}
         >
-          ✏ 再編集
+          編集
         </button>
       </div>
 
       <div className="px-4 pt-4 pb-32 space-y-3">
         {/* 書類画像 */}
-        <div
-          className="w-full h-48 rounded-2xl flex items-center justify-center"
+        <button
+          type="button"
+          onClick={() => doc.image_url && setShowImageModal(true)}
+          className="w-full h-48 rounded-2xl flex items-center justify-center overflow-hidden"
           style={{ backgroundColor: "#E8EDEA" }}
         >
           {doc.image_url ? (
@@ -140,7 +153,7 @@ export default function DocumentDetailPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
             </svg>
           )}
-        </div>
+        </button>
 
         {/* 書類情報カード */}
         <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #C8D4C9" }}>
@@ -264,6 +277,32 @@ export default function DocumentDetailPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 画像全画面表示モーダル */}
+      {showImageModal && doc.image_url && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
+          onClick={() => setShowImageModal(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setShowImageModal(false)}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-white"
+            style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+            aria-label="閉じる"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img
+            src={doc.image_url}
+            alt={doc.title ?? ""}
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
