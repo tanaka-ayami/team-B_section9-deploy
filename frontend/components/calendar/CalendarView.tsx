@@ -22,6 +22,7 @@ export function CalendarView({
 }: CalendarViewProps) {
   const fcEvents = events.map((e) => {
     const diff = dayjs(e.date).diff(dayjs().startOf("day"), "day");
+    const isExpired = !e.isDone && diff < 0;
     const isToday = !e.isDone && diff === 0;
     const isUrgent = !e.isDone && diff > 0 && diff <= 3;
     return {
@@ -30,11 +31,13 @@ export function CalendarView({
       date: e.date,
       classNames: e.isDone
         ? ["fc-event-done"]
-        : isToday
-          ? ["fc-event-today"]
-          : isUrgent
-            ? ["fc-event-urgent"]
-            : ["fc-event-normal"],
+        : isExpired
+          ? ["fc-event-expired"]
+          : isToday
+            ? ["fc-event-today"]
+            : isUrgent
+              ? ["fc-event-urgent"]
+              : ["fc-event-normal"],
     };
   });
 
@@ -118,8 +121,10 @@ export function CalendarView({
         .fc .fc-event.fc-event-urgent .fc-event-main { color: #6B2508 !important; }
         .fc .fc-event.fc-event-normal { background-color: #ADCFBA !important; color: #143d2e !important; font-weight: 500 !important; }
         .fc .fc-event.fc-event-normal .fc-event-main { color: #143d2e !important; }
-        .fc .fc-event.fc-event-done   { background-color: #C0C0C0 !important; color: #555 !important; }
-        .fc .fc-event.fc-event-done .fc-event-main { color: #555 !important; }
+        .fc .fc-event.fc-event-done   { background-color: transparent !important; color: #999 !important; font-weight: 400 !important; padding: 0px 1px !important; }
+        .fc .fc-event.fc-event-done .fc-event-main { color: #999 !important; }
+        .fc .fc-event.fc-event-expired { background-color: transparent !important; color: #D93025 !important; font-weight: 600 !important; padding: 0px 1px !important; }
+        .fc .fc-event.fc-event-expired .fc-event-main { color: #D93025 !important; }
         `}</style>  
         <FullCalendar
         plugins={[dayGridPlugin]}
