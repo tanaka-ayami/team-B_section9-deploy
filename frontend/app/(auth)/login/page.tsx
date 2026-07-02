@@ -3,7 +3,7 @@ import { AuthForm } from "@/components/auth/AuthForm";
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#f2f1ec]">
+    <div className="min-h-screen flex flex-col bg-white">
       <div
         className="flex flex-col items-center justify-center flex-[2] pt-14 pb-10 px-6 bg-[#557C79]"
       >
@@ -21,7 +21,7 @@ export default function LoginPage() {
           書類をスキャンして、家族と共有
         </p>
       </div>
-      <div className="flex-[3]">
+      <div className="flex-[3] bg-white">
         <Suspense fallback={null}>
           <AuthForm />
         </Suspense>

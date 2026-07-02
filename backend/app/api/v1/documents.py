@@ -25,11 +25,19 @@ router = APIRouter()
 
 
 @router.post("/v1/documents/scan")
-async def scan_document(file: UploadFile = File(...)):
+async def scan_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_db_user),
+):
     """
     書類画像を受け取り、Cloudinaryへ保存しつつOpenAIで内容を解析する。
     レスポンスはネストせず、フラットな形で返す（FE側の型定義に合わせる）。
     """
+    # 上限チェック（解析前に弾く。画像アップロード・OpenAI呼び出しの無駄を避ける）
+    if current_user.monthly_scan_count >= 30:
+        raise HTTPException(status_code=422, detail="SCAN_LIMIT_EXCEEDED")
+
     tmp_path = None
     try:
         suffix = os.path.splitext(file.filename)[1]
@@ -44,6 +52,10 @@ async def scan_document(file: UploadFile = File(...)):
     analysis = analyze_document_image(upload_result["image_url"])
 
     if analysis:
+        # 解析成功時のみカウントアップ
+        current_user.monthly_scan_count += 1
+        db.commit()
+
         return {
             "title": analysis.title,
             "category": analysis.category,
@@ -53,6 +65,7 @@ async def scan_document(file: UploadFile = File(...)):
         }
     else:
         # 解析失敗時は各フィールドをnullにして返す（issue #19の要件通り）
+        # monthly_scan_countは増やさない（無料枠を消費させない）
         return {
             "title": None,
             "category": None,
@@ -60,7 +73,6 @@ async def scan_document(file: UploadFile = File(...)):
             "has_deadline": False,
             "image_url": upload_result["image_url"],
         }
-
 
 class DocumentCreate(BaseModel):
     group_id: UUID

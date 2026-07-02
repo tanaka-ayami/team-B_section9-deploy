@@ -323,7 +323,6 @@ export default function SettingsPage() {
                 他メンバーの登録時・個別タップで既読
               </p>
             </div>
-            <span className="text-xs font-medium text-[#557C79]">常時ON</span>
           </div>
         </div>
 

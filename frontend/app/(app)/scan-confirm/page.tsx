@@ -248,10 +248,8 @@ export default function ScanConfirmPage() {
             style={{ backgroundColor: hasDeadline ? "#557C79" : "#D2D4BC" }}
           >
             <span
-              className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform"
-              style={{
-                transform: hasDeadline ? "translateX(22px)" : "translateX(2px)",
-              }}
+              className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200"
+              style={{ left: hasDeadline ? "calc(100% - 22px)" : "2px" }}
             />
           </button>
         </div>
