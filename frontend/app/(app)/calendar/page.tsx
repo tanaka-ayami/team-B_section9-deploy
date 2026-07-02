@@ -37,7 +37,6 @@ export default function CalendarPage() {
           categories.map((c: Category) => [c.id, c.icon ?? "📄"])
         );
 
-        // 所属する全グループの「書類一覧」と「メンバー一覧」をまとめて取得
         const [docsByGroup, membersByGroup] = await Promise.all([
           Promise.all(groups.map((g) => documentApi.list(g.id))),
           Promise.all(groups.map((g) => groupApi.getMembers(g.id))),
@@ -68,7 +67,15 @@ export default function CalendarPage() {
     }
 
     load();
-    return () => { cancelled = true; };
+
+    // router.back() はブラウザ履歴操作なので popstate で検知
+    const handlePopState = () => load();
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, []);
 
   const calendarEvents = documents
