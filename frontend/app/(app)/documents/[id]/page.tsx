@@ -4,24 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dayjs from "dayjs";
-import { apiClient } from "@/lib/api";
-import { Document, PatchDocumentRequest } from "@/types/document";
-
-// ─── モックデータ（Week2でAPIに切り替え） ───────────────────────
-const MOCK_DOCUMENT: Document = {
-  id: "doc-001",
-  title: "夏期講習 申込書",
-  category_id: "cat-001",
-  categoryName: "学校",
-  group_id: "group-001",
-  image_url: "",
-  has_deadline: true,
-  deadline_date: "2026-06-26",
-  is_done: false,
-  created_by: "user-001",
-  created_at: "2026-06-20T10:00:00Z",
-};
-// ────────────────────────────────────────────────────────────────
+import { documentApi, Document } from "@/lib/api";
 
 export default function DocumentDetailPage() {
   const router = useRouter();
@@ -35,31 +18,31 @@ export default function DocumentDetailPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // トースト表示
   function showToast(message: string) {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
   }
 
-  // 書類取得（現在はモック）
+  // 書類取得（実API）
   useEffect(() => {
     setLoading(true);
-    // TODO: Week2で apiClient.get<Document>(`/v1/documents/${id}`) に切り替え
-    setTimeout(() => {
-      setDoc(MOCK_DOCUMENT);
-      setIsDone(MOCK_DOCUMENT.is_done);
-      setLoading(false);
-    }, 300);
+    documentApi.get(id)
+      .then((data) => {
+        setDoc(data);
+        setIsDone(data.is_done);
+        setReminderCancelled(data.is_done);
+      })
+      .catch(() => showToast("書類の取得に失敗しました"))
+      .finally(() => setLoading(false));
   }, [id]);
 
-  // 済スタンプ切り替え
+  // 済スタンプ切り替え（実API）
   async function handleToggleDone() {
     if (!doc) return;
     const newIsDone = !isDone;
     setIsDone(newIsDone);
     try {
-      // TODO: Week2で実API接続
-      // await apiClient.patch<Document>(`/v1/documents/${id}`, { is_done: newIsDone });
+      await documentApi.update(id, { is_done: newIsDone });
       if (newIsDone) {
         setReminderCancelled(true);
         showToast("リマインドメールがキャンセルされました");
@@ -67,16 +50,15 @@ export default function DocumentDetailPage() {
         setReminderCancelled(false);
       }
     } catch {
-      setIsDone(!newIsDone); // ロールバック
+      setIsDone(!newIsDone);
       showToast("更新に失敗しました");
     }
   }
 
-  // 削除
+  // 削除（実API）
   async function handleDelete() {
     try {
-      // TODO: Week2で実API接続
-      // await apiClient.delete(`/v1/documents/${id}`);
+      await documentApi.delete(id);
       showToast("書類を削除しました");
       setTimeout(() => router.replace("/calendar"), 1000);
     } catch {
@@ -139,7 +121,7 @@ export default function DocumentDetailPage() {
         <button
           type="button"
           className="text-white text-xs border border-white/50 rounded-full px-3 py-1"
-          onClick={() => showToast("再編集は Week2 で実装予定です")}
+          onClick={() => showToast("再編集は別途対応予定です")}
         >
           ✏ 再編集
         </button>
@@ -162,7 +144,6 @@ export default function DocumentDetailPage() {
 
         {/* 書類情報カード */}
         <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #C8D4C9" }}>
-          {/* タイトル */}
           <div className="px-4 py-3 flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 flex-1">
               <span className="text-base mt-0.5">🏷</span>
@@ -183,7 +164,6 @@ export default function DocumentDetailPage() {
 
           <div style={{ borderTop: "1px solid #EEF1EC" }} />
 
-          {/* 提出期限 */}
           <div className="px-4 py-3 flex items-start gap-2">
             <span className="text-base mt-0.5">📅</span>
             <div>
@@ -196,7 +176,6 @@ export default function DocumentDetailPage() {
 
           <div style={{ borderTop: "1px solid #EEF1EC" }} />
 
-          {/* カテゴリ */}
           <div className="px-4 py-3 flex items-start gap-2">
             <span className="text-base mt-0.5">📂</span>
             <div>
@@ -213,7 +192,6 @@ export default function DocumentDetailPage() {
               <span className="text-base">✅</span>
               <span className="text-sm font-medium text-[#1F2D24]">済スタンプ</span>
             </div>
-            {/* トグル */}
             <button
               type="button"
               onClick={handleToggleDone}
@@ -222,7 +200,7 @@ export default function DocumentDetailPage() {
             >
               <span
                 className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
-                style={{ transform: isDone ? "translateX(24px)" : "translateX(2px)" }}
+                style={{ left: isDone ? "calc(100% - 22px)" : "2px" }}
               />
             </button>
           </div>
