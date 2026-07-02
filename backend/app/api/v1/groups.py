@@ -23,6 +23,7 @@ from app.models.user import Group, GroupMember, User
 from app.schemas.group import GroupCreate, GroupMemberRead, GroupRead
 from app.schemas.invitation import InvitationCreate, InvitationRead
 from app.services.sendgrid_service import send_invitation_email
+from app.schemas.group import GroupCreate, GroupMemberRead, GroupRead, GroupUpdate
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -96,6 +97,21 @@ def delete_group(
             "GROUP_DELETE_CONFLICT",
             "このグループに紐づく書類またはカテゴリが存在するため削除できません",
         )
+
+@router.patch("/{group_id}", response_model=GroupRead)
+def update_group(
+    group_id: uuid.UUID,
+    body: GroupUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    group = _get_group_or_404(db, group_id)
+    _require_member(db, group_id, current_user.id)
+
+    group.name = body.name
+    db.commit()
+    db.refresh(group)
+    return group
 
 
 @router.get("/{group_id}/members", response_model=list[GroupMemberRead])
