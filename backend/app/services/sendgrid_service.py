@@ -11,7 +11,7 @@ from sendgrid.helpers.mail import Mail
 
 logger = logging.getLogger(__name__)
 
-FRONTEND_BASE_URL = "http://localhost:3000"  # 本番ではVercelのドメインに変更
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
 
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL")
