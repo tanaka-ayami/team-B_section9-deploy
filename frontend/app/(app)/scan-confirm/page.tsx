@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { categoryApi, groupApi, documentApi, Category, Group } from "@/lib/api";
+import { ImageLightbox } from "@/components/ui/ImageLightbox";
 
 interface ScanResult {
   image_url: string | null;
@@ -15,6 +16,7 @@ interface ScanResult {
 export default function ScanConfirmPage() {
   const router = useRouter();
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [showLightbox, setShowLightbox] = useState(false);
   const [title, setTitle] = useState("");
 
   // カテゴリ：名前文字列ではなくidで管理（APIから取得した11種類）
@@ -132,11 +134,14 @@ export default function ScanConfirmPage() {
         {/* 画像プレビュー */}
         {scanResult.image_url && (
           <div className="relative rounded-2xl overflow-hidden bg-white border border-[#D2D4BC]">
-            <img
-              src={scanResult.image_url}
-              alt="書類"
-              className="w-full object-contain max-h-48"
-            />
+            <div className="max-h-80 overflow-y-auto">
+              <img
+                src={scanResult.image_url}
+                alt="書類"
+                className="w-full block cursor-zoom-in"
+                onClick={() => setShowLightbox(true)}
+              />
+            </div>
             <span
               className="absolute top-2 right-2 text-xs px-2 py-1 rounded-full font-medium"
               style={
@@ -147,7 +152,7 @@ export default function ScanConfirmPage() {
             >
               {isAnalyzed ? "✦ AI解析済み" : "⚠ 解析失敗"}
             </span>
-          </div>
+            </div>
         )}
 
         {/* エラーバナー */}
@@ -299,6 +304,15 @@ export default function ScanConfirmPage() {
           登録後も詳細画面から再修正できます
         </p>
       </div>
+
+      {scanResult.image_url && (
+        <ImageLightbox
+          open={showLightbox}
+          imageUrl={scanResult.image_url}
+          alt="書類（拡大表示）"
+          onClose={() => setShowLightbox(false)}
+        />
+      )}
     </div>
   );
 }

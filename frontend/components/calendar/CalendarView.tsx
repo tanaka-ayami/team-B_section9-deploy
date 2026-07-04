@@ -127,25 +127,26 @@ export function CalendarView({
         .fc .fc-event.fc-event-expired .fc-event-main { color: #D93025 !important; }
         `}</style>  
         <FullCalendar
-        plugins={[dayGridPlugin]}
-        initialView="dayGridMonth"
-        locale="ja"
-        events={fcEvents}
-        headerToolbar={{
-          left: "prev",
-          center: "title",
-          right: "next",
-        }}
-        height="auto"
-        dayHeaderFormat={{ weekday: "narrow" }}
-        dayCellContent={(arg) => arg.dayNumberText.replace("日", "")}
-        datesSet={(info) => {
-          if (onMonthChange) {
-            const d = info.view.currentStart;
-            onMonthChange(d.getFullYear(), d.getMonth() + 1);
-          }
-        }}
-      />
+          plugins={[dayGridPlugin]}
+          initialView="dayGridMonth"
+          locale="ja"
+          events={fcEvents}
+          headerToolbar={{
+            left: "prev",
+            center: "title",
+            right: "next",
+          }}
+          height="auto"
+          fixedWeekCount={false}
+          dayHeaderFormat={{ weekday: "narrow" }}
+          dayCellContent={(arg) => arg.dayNumberText.replace("日", "")}
+          datesSet={(info) => {
+            if (onMonthChange) {
+              const d = info.view.currentStart;
+              onMonthChange(d.getFullYear(), d.getMonth() + 1);
+            }
+          }}
+        />
     </div>
   );
 }

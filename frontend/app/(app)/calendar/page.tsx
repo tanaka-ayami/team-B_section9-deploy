@@ -110,7 +110,7 @@ export default function CalendarPage() {
           />
         </div>
       </div>
-      <section className="px-4 pt-4 pb-2">
+      <section className="px-4 pt-4 pb-28">
         <p className="text-xs mb-3 text-[#557C79] opacity-60">
           {currentYear}年{currentMonth}月の書類
         </p>
