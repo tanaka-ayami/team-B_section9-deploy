@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { groupApi, userApi, billingApi, Group, UserMe } from "@/lib/api";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 // プランの上限（30枚）はAPIから取得できないため引き続きフロント側の固定値とする
 const PLAN_LIMIT = 30;
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   const [remindDays, setRemindDays] = useState(3);
   const [emailNotifyEnabled, setEmailNotifyEnabled] = useState(true);
   const [isSavingRemind, setIsSavingRemind] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
 
   useEffect(() => {
@@ -31,7 +33,9 @@ export default function SettingsPage() {
   const scanRemaining = user
     ? PLAN_LIMIT - user.monthly_scan_count
     : PLAN_LIMIT;
-  const scanProgress = user ? (user.monthly_scan_count / PLAN_LIMIT) * 100 : 0;
+  const scanProgress = user
+  ? (user.monthly_scan_count / PLAN_LIMIT) * 100
+  : 0;
 
   const handleRemindSave = async () => {
     setIsSavingRemind(true);
@@ -46,13 +50,15 @@ export default function SettingsPage() {
     }
   };
 
-  const handleLogout = async () => {
-    const confirmed = window.confirm("ログアウトしますか？");
-    if (!confirmed) return;
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleLogoutConfirmed = async () => {
+    setShowLogoutConfirm(false);
     await signOut(auth);
     router.replace("/login");
   };
-
   return (
     <div className="min-h-screen bg-[#f2f1ec]">
       {/* ページヘッダー */}
@@ -83,8 +89,11 @@ export default function SettingsPage() {
                 style={{ width: `${scanProgress}%` }}
               />
             </div>
-            <p className="text-xs text-[#8fa09e] mt-1.5">
-              今月のスキャン残り：{scanRemaining}枚/{PLAN_LIMIT}枚
+            <p className="text-sm text-[#1F2D24] mt-1.5">
+              今月はあと <span className="font-semibold text-[#557C79]">{scanRemaining}</span> 枚スキャンできます
+            </p>
+            <p className="text-xs text-[#8fa09e]">
+              {PLAN_LIMIT}枚以上利用の場合はプラン変更へ
             </p>
             <p className="text-xs text-[#8fa09e]">
               （毎月1日AM0:00 JSTにリセット）
@@ -175,11 +184,19 @@ export default function SettingsPage() {
               </svg>
               <span className="text-sm text-[#1F2D24]">期限の</span>
               <input
-                type="number"
-                min={1}
-                max={30}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={remindDays}
-                onChange={(e) => setRemindDays(Number(e.target.value))}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9]/g, "");
+                  if (raw === "") {
+                    setRemindDays(0);
+                    return;
+                  }
+                  const num = Number(raw);
+                  setRemindDays(Math.min(30, Math.max(1, num)));
+                }}
                 className="w-14 text-center text-sm font-semibold rounded-lg border border-[#D2D4BC] py-1.5 bg-[#F5F6F2] text-[#1F2D24]"
               />
               <span className="text-sm text-[#1F2D24]">日前にメール送信</span>
@@ -293,39 +310,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* 通知（固定） */}
-        <div>
-          <p className="text-xs text-[#8fa09e] mb-2 px-1">通知</p>
-          <div className="bg-white rounded-2xl p-4 flex items-center gap-3">
-            <span
-              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: "#EEF1EC" }}
-            >
-              <svg
-                className="w-4 h-4 text-[#557C79]"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
-                />
-              </svg>
-            </span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-[#1F2D24]">
-                アプリ内お知らせ
-              </p>
-              <p className="text-xs text-[#8fa09e]">
-                他メンバーの登録時・個別タップで既読
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* アカウント */}
         <div>
           <p className="text-xs text-[#8fa09e] mb-2 px-1">アカウント</p>
@@ -370,7 +354,7 @@ export default function SettingsPage() {
 
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               className="w-full flex items-center gap-3 px-4 py-4 hover:bg-[#f2f1ec] transition-colors"
             >
               <svg
@@ -391,6 +375,16 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={showLogoutConfirm}
+        title="ログアウト"
+        message={`${user?.display_name ?? ""}さん、ログアウトしますか？`}
+        confirmLabel="ログアウト"
+        onConfirm={handleLogoutConfirmed}
+        onCancel={() => setShowLogoutConfirm(false)}
+        danger
+      />
     </div>
   );
 }
