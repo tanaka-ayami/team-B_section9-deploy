@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dayjs from "dayjs";
 import { documentApi, Document } from "@/lib/api";
+import { ImageLightbox } from "@/components/ui/ImageLightbox";
 
 export default function DocumentDetailPage() {
   const router = useRouter();
@@ -67,17 +68,6 @@ export default function DocumentDetailPage() {
     }
     setShowDeleteDialog(false);
   }
-
-  // ESCキーで画像モーダルを閉じる
-  useEffect(() => {
-    if (!showImageModal) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setShowImageModal(false);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showImageModal]);
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f2f1ec]">
@@ -304,6 +294,15 @@ export default function DocumentDetailPage() {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+      {/* 画像全画面表示モーダル */}
+      {doc.image_url && (
+        <ImageLightbox
+          open={showImageModal}
+          imageUrl={doc.image_url}
+          alt={doc.title ?? ""}
+          onClose={() => setShowImageModal(false)}
+        />
       )}
     </div>
   );
