@@ -115,7 +115,7 @@ export function CalendarView({
 }
         .fc .fc-event-title  { font-size: 0.6rem !important; color: inherit !important; }
         .fc .fc-daygrid-event-dot { display: none !important; }
-        .fc .fc-event.fc-event-today  { background-color: #D45D1E !important; color: #fff !important; font-weight: 400 !important; }
+        .fc .fc-event.fc-event-today  { background-color: #DC2626 !important; color: #fff !important; font-weight: 400 !important; }
         .fc .fc-event.fc-event-today .fc-event-main { color: #fff !important; }
         .fc .fc-event.fc-event-urgent { background-color: #F5C29B !important; color: #6B2508 !important; font-weight: 500 !important; }
         .fc .fc-event.fc-event-urgent .fc-event-main { color: #6B2508 !important; }
