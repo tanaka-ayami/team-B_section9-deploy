@@ -93,9 +93,16 @@ export default function DocumentsPage() {
     return documents.filter((d) => d.categoryName === selectedCategory);
   }, [documents, selectedCategory]);
 
-  const withDeadline = filtered.filter((d) => d.hasDeadline && !d.isDone);
+  const byDeadlineAsc = (a: DisplayDocument, b: DisplayDocument) => {
+    if (!a.deadlineDate && !b.deadlineDate) return 0;
+    if (!a.deadlineDate) return 1;
+    if (!b.deadlineDate) return -1;
+    return a.deadlineDate < b.deadlineDate ? -1 : 1;
+  };
+
+  const withDeadline = filtered.filter((d) => d.hasDeadline && !d.isDone).sort(byDeadlineAsc);
   const noDeadline = filtered.filter((d) => !d.hasDeadline && !d.isDone);
-  const done = filtered.filter((d) => d.isDone);
+  const done = filtered.filter((d) => d.isDone).sort(byDeadlineAsc);
 
   return (
     <div className="min-h-screen bg-[#f2f1ec]">
