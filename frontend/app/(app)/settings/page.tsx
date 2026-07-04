@@ -56,8 +56,12 @@ export default function SettingsPage() {
 
   const handleLogoutConfirmed = async () => {
     setShowLogoutConfirm(false);
-    await signOut(auth);
-    router.replace("/login");
+    try {
+      await signOut(auth);
+      router.replace("/login");
+    } catch (e) {
+      alert("ログアウトに失敗しました。もう一度お試しください。");
+    }
   };
   return (
     <div className="min-h-screen bg-[#f2f1ec]">
