@@ -115,7 +115,7 @@ export function CalendarView({
 }
         .fc .fc-event-title  { font-size: 0.6rem !important; color: inherit !important; }
         .fc .fc-daygrid-event-dot { display: none !important; }
-        .fc .fc-event.fc-event-today  { background-color: #D45D1E !important; color: #fff !important; font-weight: 400 !important; }
+        .fc .fc-event.fc-event-today  { background-color: #DC2626 !important; color: #fff !important; font-weight: 400 !important; }
         .fc .fc-event.fc-event-today .fc-event-main { color: #fff !important; }
         .fc .fc-event.fc-event-urgent { background-color: #F5C29B !important; color: #6B2508 !important; font-weight: 500 !important; }
         .fc .fc-event.fc-event-urgent .fc-event-main { color: #6B2508 !important; }
@@ -127,25 +127,26 @@ export function CalendarView({
         .fc .fc-event.fc-event-expired .fc-event-main { color: #D93025 !important; }
         `}</style>  
         <FullCalendar
-        plugins={[dayGridPlugin]}
-        initialView="dayGridMonth"
-        locale="ja"
-        events={fcEvents}
-        headerToolbar={{
-          left: "prev",
-          center: "title",
-          right: "next",
-        }}
-        height="auto"
-        dayHeaderFormat={{ weekday: "narrow" }}
-        dayCellContent={(arg) => arg.dayNumberText.replace("日", "")}
-        datesSet={(info) => {
-          if (onMonthChange) {
-            const d = info.view.currentStart;
-            onMonthChange(d.getFullYear(), d.getMonth() + 1);
-          }
-        }}
-      />
+          plugins={[dayGridPlugin]}
+          initialView="dayGridMonth"
+          locale="ja"
+          events={fcEvents}
+          headerToolbar={{
+            left: "prev",
+            center: "title",
+            right: "next",
+          }}
+          height="auto"
+          fixedWeekCount={false}
+          dayHeaderFormat={{ weekday: "narrow" }}
+          dayCellContent={(arg) => arg.dayNumberText.replace("日", "")}
+          datesSet={(info) => {
+            if (onMonthChange) {
+              const d = info.view.currentStart;
+              onMonthChange(d.getFullYear(), d.getMonth() + 1);
+            }
+          }}
+        />
     </div>
   );
 }

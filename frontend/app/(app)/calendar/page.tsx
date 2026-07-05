@@ -87,12 +87,16 @@ export default function CalendarPage() {
       isDone: d.isDone,
     }));
 
-  const monthlyDocuments = documents.filter((d) => {
-    if (!d.deadlineDate) return false;
-    const [y, m] = d.deadlineDate.split("-").map(Number);
-    return y === currentYear && m === currentMonth;
-  });
-
+  const monthlyDocuments = documents
+    .filter((d) => {
+      if (!d.deadlineDate) return false;
+      const [y, m] = d.deadlineDate.split("-").map(Number);
+      return y === currentYear && m === currentMonth;
+    })
+    .sort((a, b) => {
+      if (a.isDone !== b.isDone) return a.isDone ? 1 : -1;
+      return a.deadlineDate! < b.deadlineDate! ? -1 : 1;
+    });
   return (
     <div className="min-h-screen bg-[#f2f1ec]">
       <div className="px-4 pt-4">
@@ -106,7 +110,7 @@ export default function CalendarPage() {
           />
         </div>
       </div>
-      <section className="px-4 pt-4 pb-2">
+      <section className="px-4 pt-4 pb-28">
         <p className="text-xs mb-3 text-[#557C79] opacity-60">
           {currentYear}年{currentMonth}月の書類
         </p>
