@@ -68,10 +68,10 @@ export function NotificationDrawer({
       />
 
       {/* ドロワー本体 */}
-      <div className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-sm bg-white shadow-xl flex flex-col">
+      <div className="fixed top-0 right-0 bottom-0 z-50 w-[88%] max-w-sm bg-white shadow-xl flex flex-col">
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-[#D2D4BC]">
-          <h2 className="text-base font-semibold text-[#1F2D24]">お知らせ</h2>
+          <h2 className="text-base font-semibold text-white px-3 py-1.5 rounded-lg inline-block" style={{ backgroundColor: "#557C79" }}>お知らせ</h2>
           <button
             type="button"
             onClick={onClose}
