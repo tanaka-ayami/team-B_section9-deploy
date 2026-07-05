@@ -11,6 +11,15 @@ if (typeof window !== "undefined") {
   });
 }
 
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = "ApiError";
+  }
+}
+
 type Method = "GET" | "POST" | "PATCH" | "DELETE";
 
 async function request<T>(
@@ -31,7 +40,10 @@ async function request<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`API ${res.status} ${res.statusText}: ${text}`);
+    throw new ApiError(
+      res.status,
+      `API ${res.status} ${res.statusText}: ${text}`,
+    );
   }
 
   const text = await res.text();
@@ -50,7 +62,10 @@ async function requestForm<T>(path: string, formData: FormData): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`API ${res.status} ${res.statusText}: ${text}`);
+    throw new ApiError(
+      res.status,
+      `API ${res.status} ${res.statusText}: ${text}`,
+    );
   }
 
   const text = await res.text();

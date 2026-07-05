@@ -33,9 +33,7 @@ export default function SettingsPage() {
   const scanRemaining = user
     ? PLAN_LIMIT - user.monthly_scan_count
     : PLAN_LIMIT;
-  const scanProgress = user
-  ? (user.monthly_scan_count / PLAN_LIMIT) * 100
-  : 0;
+  const scanProgress = user ? (user.monthly_scan_count / PLAN_LIMIT) * 100 : 0;
 
   const handleRemindSave = async () => {
     setIsSavingRemind(true);
@@ -94,7 +92,11 @@ export default function SettingsPage() {
               />
             </div>
             <p className="text-sm text-[#1F2D24] mt-1.5">
-              今月はあと <span className="font-semibold text-[#557C79]">{scanRemaining}</span> 枚スキャンできます
+              今月はあと{" "}
+              <span className="font-semibold text-[#557C79]">
+                {scanRemaining}
+              </span>{" "}
+              枚スキャンできます
             </p>
             <p className="text-xs text-[#8fa09e]">
               {PLAN_LIMIT}枚以上利用の場合はプラン変更へ
@@ -103,6 +105,11 @@ export default function SettingsPage() {
               （毎月1日AM0:00 JSTにリセット）
             </p>
           </div>
+
+          {/* プレミアムプランの説明（issue #133） */}
+          <p className="text-xs text-[#8fa09e] px-1">
+            プレミアムプランなら、スキャン枚数を気にせずご利用いただけます
+          </p>
 
           {/* Stripeボタン */}
           <button
