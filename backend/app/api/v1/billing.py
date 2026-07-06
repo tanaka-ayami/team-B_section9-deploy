@@ -9,6 +9,8 @@
 - 決済の成否は同期レスポンスではなく、Stripeから送られてくるWebhookイベントで
   確定させる（チェックアウトページ上でユーザーが離脱した場合などを考慮）。
 """
+import os
+
 import stripe
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
@@ -24,10 +26,7 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-# 決済完了後・キャンセル後にユーザーを戻すフロントエンドのURL。
-# 本来は環境変数化が望ましいが、他のフロントURLもまだ.env管理されていないため
-# 既存の構成に合わせて一旦ここに定義する（要・後続issueでの環境変数化検討）。
-FRONTEND_BASE_URL = "http://localhost:3000"
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
 
 
 @router.post(
