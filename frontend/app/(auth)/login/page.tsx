@@ -18,7 +18,7 @@ export default function LoginPage() {
         </div>
         <h1 className="text-2xl font-medium text-white tracking-wider">Scanly</h1>
         <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.7)" }}>
-          書類をスキャンして、家族と共有
+          撮るだけで管理。ひとりでも。家族でも。
         </p>
       </div>
       <div className="flex-[3] bg-white">
