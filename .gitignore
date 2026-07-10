@@ -160,3 +160,4 @@ __pycache__/
 .venv/
 venv/
 
+backend/.coverage
